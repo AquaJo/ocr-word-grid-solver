@@ -1,0 +1,2 @@
+Tool for analyzing a grid-search-puzzle, even if you don't know the words it contains.
+Analyzes diagonals, rows and cells in both directions.

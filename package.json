@@ -1,0 +1,17 @@
+{
+  "name": "grid-puzzle-solver",
+  "version": "1.0.0",
+  "description": "solve grid puzzles",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "AquaJo",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^2.6.9",
+    "tesseract.js": "^4.0.3"
+  }
+}
