@@ -29,7 +29,7 @@ app.listen(3000, () => {
 
 
 
-myAsyncLoad();
+//myAsyncLoad();
 async function myAsyncLoad() {
 
     let germanWords = [];
@@ -78,22 +78,24 @@ async function myAsyncLoad() {
         console.log(`number of german words in wordlist: ${germanWords.length}`);
         console.log(`number of englisch words in wordlist: ${englishWords.length}`);
 
-        let engTest = "ill";
+        let engTest = "apple";
         let deTest = "apfel";
         console.log("is word " + engTest + " english?: " + isEnglish(engTest));
         console.log("is word " + deTest + " german?: " + isGerman(deTest));
 
         // NOW TO GRID TESTING
 
+        /*
         let grid =
-        [  
-        ['a', 'f', 'i', 'd', 'e'],
-        ['r', 'l', 'l', 'i', 'j'],
-        ['l', 'a', 'l', 's', 'o'],
-        ['p', 'q', 'c', 's', 'h'],
-        ['u', 'v', 'w', 'x', 'y']
-      ];
-        //let grid = inputToGrid("hGyRCPyxlFLPdsRkgTYZ,AYoSXsVOdehUMQCPsFPx,JulThCrFnUNkfblOagbW,bmwKqLaZVcovTswIZKJw,qKGvbyjpyjvNSdWiUgIO,wVDyTANsJaewvTGPAJUa,svXIxGHUeHdmpPQfbGrA,IFlbtTSpNDgnZZvuEQIv,ntsGWNauWUmUomROMPUx,ZYnYahZeHqTsdMuAnQec,CXgcKMGUbayrwkeSigmV,NMdZqqgxCxtDcHolmUdB,QiElqqRGpoeLAlvUdViY,bKVZPcYrSjiVQxidtdbr,pitYQnuPKdpHSxrgDQiu,TAVtaGnEHfAUIoaITQJR");
+            [
+                ['a', 'f', 'i', 'd', 'e'],
+                ['r', 'l', 'l', 'i', 'j'],
+                ['l', 'a', 'l', 's', 'o'],
+                ['p', 'q', 'c', 's', 'h'],
+                ['u', 'v', 'w', 'x', 'y']
+            ];
+        */
+        let grid = inputToGrid("hGyRCPyxlFLPdsRkgTYZ,AYoSXsVOdehUMQCPsFPx,JulThCrFnUNkfblOagbW,bmwKqLaZVcovTswIZKJw,qKGvbyjpyjvNSdWiUgIO,wVDyTANsJaewvTGPAJUa,svXIxGHUeHdmpPQfbGrA,IFlbtTSpNDgnZZvuEQIv,ntsGWNauWUmUomROMPUx,ZYnYahZeHqTsdMuAnQec,CXgcKMGUbayrwkeSigmV,NMdZqqgxCxtDcHolmUdB,QiElqqRGpoeLAlvUdViY,bKVZPcYrSjiVQxidtdbr,pitYQnuPKdpHSxrgDQiu,TAVtaGnEHfAUIoaITQJR");
 
 
 
@@ -124,9 +126,11 @@ async function myAsyncLoad() {
         console.groupEnd();
 
         console.group("end - information");
+        // sort found words by length
+        foundWords = foundWords.sort(function (a, b) { return b.length - a.length });
         // sort found words by commonality
         let sort = sortArrByCommonality(foundWords);
-        console.log("final array sort by commonality with the help of a shorter dictionary (some common words can still be missed): ");
+        console.log("final array sort by commonality with the help of a shorter dictionary (some common words might still be missed in ranking by commonality): ");
         console.log(sort);
         console.groupEnd();
 
@@ -230,13 +234,23 @@ async function myAsyncLoad() {
     function sortArrByCommonality(arr) {
         let res = [];
         function isWordInFiles(arrPaths, word) {
+            word = word.toLowerCase();
             for (let i = 0; i < arrPaths.length; ++i) {
                 const data = fs.readFileSync(arrPaths[i], 'utf-8');
                 const json = JSON.parse(data);
                 let keys = Object.keys(json);
                 keys = keys.map((str) => str.toLowerCase());
-                if (keys.includes(word.toLowerCase())) {
+                if (keys.includes(word)) {
                     return true;
+                } else { // deeper search: e.g. when searching for car: is there a key combination with xx car or -car] or [car-, but simply not car as dictionary word itself (standing alone)
+                    for (let i = 0; i < keys.length; ++i) {
+                        let key = keys[i];
+                        if (key.includes(word)) {
+                            if (key.split(" ").includes(word) || key.split("-").includes(word)) {
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
             return false;
@@ -382,12 +396,222 @@ async function myAsyncLoad() {
 
 
 
-/*const Tesseract = require('tesseract.js'); // Tesseract requires internet connection
+
+
+const sharp = require('sharp');
+
+let imgPath = "./puzzles/wordsearch.png"
+sharp(imgPath)
+    .modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
+    .grayscale()
+    .raw()
+    .toBuffer((err, buffer, info) => {
+        if (err) throw err;
+
+        // `buffer` enthält das rohe Pixelarray
+        const pixels = [];
+
+        for (let i = 0; i < info.height; i++) {
+            const row = [];
+            for (let j = 0; j < info.width; j++) {
+                const offset = (i * info.width + j) * info.channels;
+                const r = buffer[offset];
+                const g = buffer[offset + 1];
+                const b = buffer[offset + 2];
+                row.push({ r, g, b });
+            }
+            pixels.push(row);
+        }
+
+
+        // Verwenden Sie das Pixelarray für weitere Verarbeitungsschritte
+        console.log(info); // Informationen über das Bild, z.B. Breite und Höhe
+        //console.log(pixels[476][668])
+        let outstandingColors = outstandingTwoColors(pixels);
+        let backgroundColor = getBackgroundColorFromTwoColors(pixels, outstandingColors[0], outstandingColors[1]);
+        console.log(backgroundColor);
+        let xCrops = getXCrops(backgroundColor, pixels);
+
+
+        console.log(xCrops);
+        for (let i = 0; i < xCrops.length; ++i) {
+            sharp(imgPath)
+                .extract({ left: i !== 0 ? Math.ceil(xCrops[i - 1]) : 0, top: 0, width: i !== 0 ? Math.ceil(xCrops[i] - xCrops[i - 1]) : Math.ceil(xCrops[0]), height: info.height })
+                .toFile('./tempVerticals/' + i + '.png', (err, info) => {
+                    if (err) {
+                        console.log(err);
+                    } else {
+                        console.log(info);
+                    }
+                });
+        }
+    });
+/*.toFile('./output.png', (err, info) => {
+    if (err) throw err;
+    console.log(info);
+});*/
+/*
+const Tesseract = require('tesseract.js'); // Tesseract requires internet connection
 
 Tesseract.recognize(
-    './wordsearch.png',
+    './3.png',
     'eng',
     { logger: m => console.log(m) }
   ).then(({ data: { text } }) => {
     console.log(text);
-  })*/
+  })
+*/
+
+function countMostOftenOccurrences(arr) {
+    var counts = {};
+    var result = [];
+
+    for (var i = 0; i < arr.length; i++) {
+        var num = arr[i];
+        counts[num] = counts[num] ? counts[num] + 1 : 1;
+    }
+
+    let biggestCount = 0;
+    let resNum = 0;
+    for (var num in counts) {
+        if (counts[num] > biggestCount) {
+            biggestCount = counts[num];
+            resNum = num;
+        }
+        result.push([Number(num), counts[num]]);
+    }
+
+    return [Number(resNum), biggestCount];
+}
+
+function getXCrops(colorBackground, pixels) {
+    let streak = 0;
+    let currentStreakBegin = 0;
+    let streaks = [];
+    for (let x = 0; x < pixels[2].length; x++) {
+        let count = 0;
+        for (let y = 0; y < pixels.length; y++) {
+            //console.log(getDistance([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b], colorBackground));
+            if (getDistance([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b], colorBackground) > 50) {
+                // color is not background color
+                count++;
+            }
+        }
+        //console.log("count: " + count + " / " + pixels.length)
+        if (count > pixels.length / 6) {
+            //console.log("found pillar");
+            streak++;
+        } else if (streak > 0) {
+            streaks.push([streak, x + 1, currentStreakBegin]);
+            console.log("got streak of " + streak + "");
+            console.log("streak x end: " + (x + 1));
+            streak = 0;
+        } else if (streak === 0) {
+            // begin of streak
+            currentStreakBegin = x+1;
+        }
+
+        //colors.push([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b]);
+    }
+    let mostOften = countMostOftenOccurrences(firstItemsOfArr(streaks));
+    let streakXEnds = getResultingStreakXEnds();
+    return streakXEnds;
+    function getResultingStreakXEnds() {
+        let res = [];
+        let finalStreaks = [];
+        for (let i = 0; i < streaks.length; i++) {
+            if (Math.abs(streaks[i][0] - mostOften[0]) < 3) {
+                finalStreaks.push(streaks[i]);
+            }
+        }
+        for (let i = 0; i < finalStreaks.length; ++i) {
+            if (i !== streaks.length - 1) {
+                res.push(finalStreaks[i][1] + (finalStreaks[i + 1][2] - finalStreaks[i][1]) / 2); // NEXTSTART - THISEND, NOT NEXTEND - THISEND !!
+            } else {
+                res.push(finalStreaks[i][1]);
+            }
+        }
+        return res;
+    }
+
+
+
+    function firstItemsOfArr(arr) {
+        let res = [];
+        for (let i = 0; i < arr.length; i++) {
+            res.push(arr[i][0]);
+        }
+        return res;
+    }
+}
+function getYCrops() {
+
+}
+
+
+
+function getBackgroundColorFromTwoColors(pixels, color1, color2) {
+    let colors = [];
+    let rSum = 0;
+    let gSum = 0;
+    let bSum = 0;
+    for (let y = 0; y < pixels.length; y++) {
+        for (let x = 0; x < 3; x++) {
+            rSum += pixels[y][x].r;
+            gSum += pixels[y][x].g;
+            bSum += pixels[y][x].b;
+            colors.push([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b]);
+        }
+    }
+    rSum /= colors.length;
+    gSum /= colors.length;
+    bSum /= colors.length;
+
+    function getMostFrequentColor(color1, color2, colors) {
+        const color1Count = colors.filter(c => getDistance(c, color1) < 50).length; // Anzahl der Farben im Array, die nahe an color1 liegen
+        const color2Count = colors.filter(c => getDistance(c, color2) < 50).length; // Anzahl der Farben im Array, die nahe an color2 liegen
+
+        if (color1Count > color2Count) {
+            return color1;
+        } else if (color2Count > color1Count) {
+            return color2;
+        } else {
+            return null; // Es gibt keine eindeutige häufigste Farbe
+        }
+    }
+
+    //return getMostFrequentColor(color1, color2, colors);
+    return [rSum, gSum, bSum];
+}
+// Funktion, die die Distanz zwischen zwei Farben berechnet
+function getDistance(color1, color2) {
+    const rDiff = color1[0] - color2[0];
+    const gDiff = color1[1] - color2[1];
+    const bDiff = color1[2] - color2[2];
+    return Math.sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
+}
+function outstandingTwoColors(pixels) {
+    // Konvertiere Pixel-Array in flaches Array mit RGB-Tripeln
+    const flatPixels = pixels.flat().map(pixel => [pixel.r, pixel.g, pixel.b]);
+
+    // Erstelle ein Objekt, das die Anzahl jeder Farbe im flachen Pixel-Array zählt
+    const colorCounts = {};
+    flatPixels.forEach(color => {
+        const key = color.join(",");
+        if (key in colorCounts) {
+            colorCounts[key]++;
+        } else {
+            colorCounts[key] = 1;
+        }
+    });
+
+    // Sortiere Farben nach ihrer Häufigkeit (absteigend)
+    const sortedColors = Object.keys(colorCounts).sort((a, b) => colorCounts[b] - colorCounts[a]);
+
+    // Bestimme die beiden am häufigsten vorkommenden Farben
+    const color1 = sortedColors[0].split(",").map(Number);
+    const color2 = sortedColors[1].split(",").map(Number);
+
+    console.log("Herausstechende Farben:", color1, color2);
+    return [color1, color2];
+}
