@@ -2,6 +2,7 @@ const fetch = require('node-fetch');
 const express = require('express');
 const app = express();
 const fs = require('fs');
+const path = require("path");
 
 
 
@@ -400,218 +401,397 @@ async function myAsyncLoad() {
 
 const sharp = require('sharp');
 
-let imgPath = "./puzzles/wordsearch.png"
-sharp(imgPath)
-    .modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
-    .grayscale()
-    .raw()
-    .toBuffer((err, buffer, info) => {
-        if (err) throw err;
+seperateLettersFromGrid("./puzzles/wordsearch.PNG", 1 / 10, 1 / 10, 50, 4); // second 1/6 eig
+function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff) {
 
-        // `buffer` enthält das rohe Pixelarray
-        const pixels = [];
+    let backgroundColor;
+    let imgPath = grid;
+    sharp(imgPath)
+        .modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
+        .grayscale()
+        .raw()
+        .toBuffer((err, buffer, info) => {
+            if (err) throw err;
 
-        for (let i = 0; i < info.height; i++) {
-            const row = [];
-            for (let j = 0; j < info.width; j++) {
-                const offset = (i * info.width + j) * info.channels;
-                const r = buffer[offset];
-                const g = buffer[offset + 1];
-                const b = buffer[offset + 2];
-                row.push({ r, g, b });
+            // `buffer` enthält das rohe Pixelarray
+            const pixels = [];
+
+            for (let i = 0; i < info.height; i++) {
+                const row = [];
+                for (let j = 0; j < info.width; j++) {
+                    const offset = (i * info.width + j) * info.channels;
+                    const r = buffer[offset];
+                    const g = buffer[offset + 1];
+                    const b = buffer[offset + 2];
+                    row.push({ r, g, b });
+                }
+                pixels.push(row);
             }
-            pixels.push(row);
-        }
 
 
-        // Verwenden Sie das Pixelarray für weitere Verarbeitungsschritte
-        console.log(info); // Informationen über das Bild, z.B. Breite und Höhe
-        //console.log(pixels[476][668])
-        let outstandingColors = outstandingTwoColors(pixels);
-        let backgroundColor = getBackgroundColorFromTwoColors(pixels, outstandingColors[0], outstandingColors[1]);
-        console.log(backgroundColor);
-        let xCrops = getXCrops(backgroundColor, pixels);
+            console.group("image analysing");
+            console.log(info);
+            // using pixel arroy now
 
+            // SET UP BASICS
+            backgroundColor = getBackgroundColorFromTwoColors(pixels);
+            console.log("recognized background color (rgb): " + backgroundColor);
 
-        console.log(xCrops);
-        for (let i = 0; i < xCrops.length; ++i) {
-            sharp(imgPath)
-                .extract({ left: i !== 0 ? Math.ceil(xCrops[i - 1]) : 0, top: 0, width: i !== 0 ? Math.ceil(xCrops[i] - xCrops[i - 1]) : Math.ceil(xCrops[0]), height: info.height })
-                .toFile('./tempVerticals/' + i + '.png', (err, info) => {
-                    if (err) {
-                        console.log(err);
-                    } else {
-                        console.log(info);
+            // GET X CROPS AND SAFE
+            let xCrops = getXCrops(backgroundColor, pixels);
+            // deleting temp folder before
+            let directory = "./tempVerticals/";
+            fs.readdir(directory, (err, files) => {
+                if (err) throw err;
+
+                for (const file of files) {
+                    fs.unlink(path.join(directory, file), (err) => {
+                        if (err) throw err;
+                    })
+                }
+
+                directory = "./tempFinals/";
+                fs.readdir(directory, (err, files) => {
+                    if (err) throw err;
+
+                    for (const file of files) {
+                        fs.unlink(path.join(directory, file), (err) => {
+                            if (err) throw err;
+                        })
+                    }
+                    deletedTempDirectory();
+                });
+            })
+            if (xCrops.length === 0) {
+                console.log("seems like there were no sections found");
+                console.groupEnd();
+            }
+            function deletedTempDirectory() {
+                let verticalPaths = [];
+                for (let i = 0; i < xCrops.length; ++i) {
+                    sharp(imgPath)
+                        .extract({ left: i !== 0 ? Math.ceil(xCrops[i - 1]) : 0, top: 0, width: i !== 0 ? Math.ceil(xCrops[i] - xCrops[i - 1]) : Math.ceil(xCrops[0]), height: info.height })
+                        .toFile('./tempVerticals/' + i + '.png', (err, info) => {
+                            verticalPaths.push('./tempVerticals/' + i + '.png');
+                            if (err) {
+                                console.log(err);
+                            } else {
+                                console.log("added " + i + '.png as vertical image part');
+                                if (i === xCrops.length - 1) {
+                                    console.log("finished vertical cropping, now cropping all letters off of already cropped vertical parts");
+                                    console.groupEnd();
+                                    // LAST --> FINISH in other function
+                                    finish();
+                                }
+                                //console.log(info);
+                            }
+                        });
+                }
+
+                function finish() {
+                    // GET Y CROPS AND SAFE
+                    let yCrops = getYCrops(backgroundColor, pixels);
+                    finishWithXCrops(verticalPaths, yCrops);
+                }
+            }
+        });
+
+    function finishWithXCrops(paths, yCrops) {
+        let allPathsLength = paths.length;
+        for (let i = 0; i < paths.length; ++i) {
+            let myPath = paths[i];
+            sharp(myPath)
+                .modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
+                .grayscale()
+                .raw()
+                .toBuffer((err, buffer, info) => {
+                    if (err) throw err;
+
+                    // `buffer` enthält das rohe Pixelarray
+                    const pixels = [];
+
+                    for (let i = 0; i < info.height; i++) {
+                        const row = [];
+                        for (let j = 0; j < info.width; j++) {
+                            const offset = (i * info.width + j) * info.channels;
+                            const r = buffer[offset];
+                            const g = buffer[offset + 1];
+                            const b = buffer[offset + 2];
+                            row.push({ r, g, b });
+                        }
+                        pixels.push(row);
+                    }
+
+                    //  console.log("cropping now vertical section of: " + myPath);
+
+                    // using pixel arroy now
+                    let splitPath = myPath.split("/");
+                    let myPartNum = Number(splitPath[splitPath.length - 1].split(".")[0]);
+
+                    for (let i = 0; i < yCrops.length; ++i) {
+                        let toFile = './tempFinals/' + ((i) * allPathsLength + (myPartNum + 1)) + '.png'; // calculate number in query ...
+                        sharp(myPath)
+                            .extract({ left: 0, top: i !== 0 ? Math.ceil(yCrops[i - 1]) : 0, width: info.width, height: i !== 0 ? Math.ceil(yCrops[i] - yCrops[i - 1]) : Math.ceil(yCrops[0]) })
+                            .toFile(toFile, (err, info) => {
+                                if (err) {
+                                    console.log(err);
+                                } else {
+                                    //  console.log("added as final image part: " + toFile);
+                                }
+                            });
                     }
                 });
         }
-    });
-/*.toFile('./output.png', (err, info) => {
-    if (err) throw err;
-    console.log(info);
-});*/
+    }
+
+
+
+
+
+
+
+
+
+    function countMostOftenOccurrences(arr) {
+        var counts = {};
+        var result = [];
+
+        for (var i = 0; i < arr.length; i++) {
+            var num = arr[i];
+            counts[num] = counts[num] ? counts[num] + 1 : 1;
+        }
+
+        let biggestCount = 0;
+        let resNum = 0;
+        for (var num in counts) {
+            if (counts[num] > biggestCount) {
+                biggestCount = counts[num];
+                resNum = num;
+            }
+            result.push([Number(num), counts[num]]);
+        }
+
+        return [Number(resNum), biggestCount];
+    }
+
+
+
+    function getYCrops(colorBackground, pixels) {
+        let streak = 0;
+        let currentStreakBegin = 0;
+        let streaks = [];
+        for (let y = 0; y < pixels.length; y++) {
+            let count = 0;
+            for (let x = 0; x < pixels[0].length; x++) {
+                //console.log(getDistance([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b], colorBackground));
+                if (getDistance([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b], colorBackground) >= minBackgroundDiff) {
+                    // color is not background color
+                    count++;
+                }
+            }
+            //console.log("count: " + count + " / " + pixels.length)
+            if (count > pixels[0].length * XFilledRequired) {
+                //console.log("found pillar");
+                streak++;
+            } else if (streak > 0) {
+                streaks.push([streak, y + 1, currentStreakBegin]);
+                //console.log("got streak of " + streak + "");
+                //console.log("streak x end: " + (x + 1));
+                streak = 0;
+            } else if (streak === 0) {
+                // begin of streak
+                currentStreakBegin = y + 1;
+            }
+
+            //colors.push([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b]);
+        }
+        let mostOften = countMostOftenOccurrences(firstItemsOfArr(streaks));
+        let streakYEnds = getResultingStreakYEnds();
+        return streakYEnds;
+        function getResultingStreakYEnds() {
+            let res = [];
+            let finalStreaks = [];
+            for (let i = 0; i < streaks.length; i++) {
+                if (Math.abs(streaks[i][0] - mostOften[0]) <= streakMaxDiff) {
+                    finalStreaks.push(streaks[i]);
+                }
+            }
+            for (let i = 0; i < finalStreaks.length; ++i) {
+                if (i !== finalStreaks.length - 1) {
+                    res.push(finalStreaks[i][1] + (finalStreaks[i + 1][2] - finalStreaks[i][1]) / 2); // + (end to start) / 2
+                } else {
+                    res.push(finalStreaks[i][1]);
+                }
+            }
+            return res;
+        }
+
+
+
+        function firstItemsOfArr(arr) {
+            let res = [];
+            for (let i = 0; i < arr.length; i++) {
+                res.push(arr[i][0]);
+            }
+            return res;
+        }
+    }
+
+
+    function getXCrops(colorBackground, pixels) {
+        let streak = 0;
+        let currentStreakBegin = 0;
+        let streaks = [];
+        for (let x = 0; x < pixels[0].length; x++) {
+            let count = 0;
+            for (let y = 0; y < pixels.length; y++) {
+                //console.log(getDistance([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b], colorBackground));
+                if (getDistance([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b], colorBackground) >= minBackgroundDiff) {
+                    // color is not background color
+                    count++;
+                }
+            }
+            //console.log("count: " + count + " / " + pixels.length)
+            if (count > pixels.length * YFilledRequired) {
+                //console.log("found pillar");
+                streak++;
+            } else if (streak > 0) {
+                streaks.push([streak, x + 1, currentStreakBegin]);
+                //console.log("got streak of " + streak + "");
+                //console.log("streak x end: " + (x + 1));
+                streak = 0;
+            } else if (streak === 0) {
+                // begin of streak
+                currentStreakBegin = x + 1;
+            }
+
+            //colors.push([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b]);
+        }
+
+        console.log(streaks)
+
+
+        let mostOften = countMostOftenOccurrences(firstItemsOfArr(streaks));
+        console.log(mostOften);
+        let streakXEnds = getResultingStreakXEnds();
+        return streakXEnds;
+        function getResultingStreakXEnds() {
+            let res = [];
+            let finalStreaks = [];
+            for (let i = 0; i < streaks.length; i++) {
+                if (Math.abs(streaks[i][0] - mostOften[0]) <= streakMaxDiff) {
+                    finalStreaks.push(streaks[i]);
+                }
+            }
+            for (let i = 0; i < finalStreaks.length; ++i) {
+                if (i !== finalStreaks.length - 1) {
+                    res.push(finalStreaks[i][1] + (finalStreaks[i + 1][2] - finalStreaks[i][1]) / 2); // + (end to start) / 2
+                } else {
+                    res.push(finalStreaks[i][1]);
+                }
+            }
+            return res;
+        }
+
+
+
+        function firstItemsOfArr(arr) {
+            let res = [];
+            for (let i = 0; i < arr.length; i++) {
+                res.push(arr[i][0]);
+            }
+            return res;
+        }
+    }
+
+
+
+
+
+    function getBackgroundColorFromTwoColors(pixels) {
+        let colors = [];
+        let rSum = 0;
+        let gSum = 0;
+        let bSum = 0;
+        for (let y = 0; y < pixels.length; y++) {
+            for (let x = 0; x < 3; x++) {
+                rSum += pixels[y][x].r;
+                gSum += pixels[y][x].g;
+                bSum += pixels[y][x].b;
+                colors.push([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b]);
+            }
+        }
+        rSum /= colors.length;
+        gSum /= colors.length;
+        bSum /= colors.length;
+
+        function getMostFrequentColor(color1, color2, colors) { // ()
+            const color1Count = colors.filter(c => getDistance(c, color1) < 50).length; // Anzahl der Farben im Array, die nahe an color1 liegen
+            const color2Count = colors.filter(c => getDistance(c, color2) < 50).length; // Anzahl der Farben im Array, die nahe an color2 liegen
+
+            if (color1Count > color2Count) {
+                return color1;
+            } else if (color2Count > color1Count) {
+                return color2;
+            } else {
+                return null; // Es gibt keine eindeutige häufigste Farbe
+            }
+        }
+
+        //return getMostFrequentColor(color1, color2, colors);
+        return [rSum, gSum, bSum];
+    }
+    // Funktion, die die Distanz zwischen zwei Farben berechnet
+    function getDistance(color1, color2) {
+        const rDiff = color1[0] - color2[0];
+        const gDiff = color1[1] - color2[1];
+        const bDiff = color1[2] - color2[2];
+        return Math.sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
+    }
+} // min max inclusive
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /*
 const Tesseract = require('tesseract.js'); // Tesseract requires internet connection
 
 Tesseract.recognize(
-    './3.png',
+    './320.png',
     'eng',
     { logger: m => console.log(m) }
   ).then(({ data: { text } }) => {
     console.log(text);
-  })
+  }) // Q - Recognizing still a bit bad (!)
 */
-
-function countMostOftenOccurrences(arr) {
-    var counts = {};
-    var result = [];
-
-    for (var i = 0; i < arr.length; i++) {
-        var num = arr[i];
-        counts[num] = counts[num] ? counts[num] + 1 : 1;
-    }
-
-    let biggestCount = 0;
-    let resNum = 0;
-    for (var num in counts) {
-        if (counts[num] > biggestCount) {
-            biggestCount = counts[num];
-            resNum = num;
-        }
-        result.push([Number(num), counts[num]]);
-    }
-
-    return [Number(resNum), biggestCount];
-}
-
-function getXCrops(colorBackground, pixels) {
-    let streak = 0;
-    let currentStreakBegin = 0;
-    let streaks = [];
-    for (let x = 0; x < pixels[2].length; x++) {
-        let count = 0;
-        for (let y = 0; y < pixels.length; y++) {
-            //console.log(getDistance([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b], colorBackground));
-            if (getDistance([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b], colorBackground) > 50) {
-                // color is not background color
-                count++;
-            }
-        }
-        //console.log("count: " + count + " / " + pixels.length)
-        if (count > pixels.length / 6) {
-            //console.log("found pillar");
-            streak++;
-        } else if (streak > 0) {
-            streaks.push([streak, x + 1, currentStreakBegin]);
-            console.log("got streak of " + streak + "");
-            console.log("streak x end: " + (x + 1));
-            streak = 0;
-        } else if (streak === 0) {
-            // begin of streak
-            currentStreakBegin = x+1;
-        }
-
-        //colors.push([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b]);
-    }
-    let mostOften = countMostOftenOccurrences(firstItemsOfArr(streaks));
-    let streakXEnds = getResultingStreakXEnds();
-    return streakXEnds;
-    function getResultingStreakXEnds() {
-        let res = [];
-        let finalStreaks = [];
-        for (let i = 0; i < streaks.length; i++) {
-            if (Math.abs(streaks[i][0] - mostOften[0]) < 3) {
-                finalStreaks.push(streaks[i]);
-            }
-        }
-        for (let i = 0; i < finalStreaks.length; ++i) {
-            if (i !== streaks.length - 1) {
-                res.push(finalStreaks[i][1] + (finalStreaks[i + 1][2] - finalStreaks[i][1]) / 2); // NEXTSTART - THISEND, NOT NEXTEND - THISEND !!
-            } else {
-                res.push(finalStreaks[i][1]);
-            }
-        }
-        return res;
-    }
-
-
-
-    function firstItemsOfArr(arr) {
-        let res = [];
-        for (let i = 0; i < arr.length; i++) {
-            res.push(arr[i][0]);
-        }
-        return res;
-    }
-}
-function getYCrops() {
-
-}
-
-
-
-function getBackgroundColorFromTwoColors(pixels, color1, color2) {
-    let colors = [];
-    let rSum = 0;
-    let gSum = 0;
-    let bSum = 0;
-    for (let y = 0; y < pixels.length; y++) {
-        for (let x = 0; x < 3; x++) {
-            rSum += pixels[y][x].r;
-            gSum += pixels[y][x].g;
-            bSum += pixels[y][x].b;
-            colors.push([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b]);
-        }
-    }
-    rSum /= colors.length;
-    gSum /= colors.length;
-    bSum /= colors.length;
-
-    function getMostFrequentColor(color1, color2, colors) {
-        const color1Count = colors.filter(c => getDistance(c, color1) < 50).length; // Anzahl der Farben im Array, die nahe an color1 liegen
-        const color2Count = colors.filter(c => getDistance(c, color2) < 50).length; // Anzahl der Farben im Array, die nahe an color2 liegen
-
-        if (color1Count > color2Count) {
-            return color1;
-        } else if (color2Count > color1Count) {
-            return color2;
-        } else {
-            return null; // Es gibt keine eindeutige häufigste Farbe
-        }
-    }
-
-    //return getMostFrequentColor(color1, color2, colors);
-    return [rSum, gSum, bSum];
-}
-// Funktion, die die Distanz zwischen zwei Farben berechnet
-function getDistance(color1, color2) {
-    const rDiff = color1[0] - color2[0];
-    const gDiff = color1[1] - color2[1];
-    const bDiff = color1[2] - color2[2];
-    return Math.sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
-}
-function outstandingTwoColors(pixels) {
-    // Konvertiere Pixel-Array in flaches Array mit RGB-Tripeln
-    const flatPixels = pixels.flat().map(pixel => [pixel.r, pixel.g, pixel.b]);
-
-    // Erstelle ein Objekt, das die Anzahl jeder Farbe im flachen Pixel-Array zählt
-    const colorCounts = {};
-    flatPixels.forEach(color => {
-        const key = color.join(",");
-        if (key in colorCounts) {
-            colorCounts[key]++;
-        } else {
-            colorCounts[key] = 1;
-        }
-    });
-
-    // Sortiere Farben nach ihrer Häufigkeit (absteigend)
-    const sortedColors = Object.keys(colorCounts).sort((a, b) => colorCounts[b] - colorCounts[a]);
-
-    // Bestimme die beiden am häufigsten vorkommenden Farben
-    const color1 = sortedColors[0].split(",").map(Number);
-    const color2 = sortedColors[1].split(",").map(Number);
-
-    console.log("Herausstechende Farben:", color1, color2);
-    return [color1, color2];
-}
