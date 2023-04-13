@@ -407,9 +407,13 @@ const sharp = require('sharp');
 
 
 
+test();
+async function test() {
+    await seperateLettersFromGrid("./puzzles/medianandridge3x3100addent.jpg", "./letterSeperator", 1 / 10, 1 / 10, 50, 4, "none"); // second (number param) 1/6 before
+    console.log("done");
+}
 
-seperateLettersFromGrid("./puzzles/medianandridge3x3100addent.jpg", "./letterSeperator", 1 / 10, 1 / 10, 50, 4); // second (number param) 1/6 before
-function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff) {
+async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff, filter) {
     let backgroundColor;
     let imgPath = grid;
 
@@ -421,52 +425,42 @@ function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilledRequir
             fs.mkdirSync(dir, { recursive: true });
         }
     }
-
-    sharp(imgPath)
-        .modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
-        .grayscale()
-        .raw()
-        .toBuffer((err, buffer, info) => {
-            if (err) throw err;
-
-            // `buffer` enthält das rohe Pixelarray
-            const pixels = [];
-
-            for (let i = 0; i < info.height; i++) {
-                const row = [];
-                for (let j = 0; j < info.width; j++) {
-                    const offset = (i * info.width + j) * info.channels;
-                    const r = buffer[offset];
-                    const g = buffer[offset + 1];
-                    const b = buffer[offset + 2];
-                    row.push({ r, g, b });
-                }
-                pixels.push(row);
-            }
-
-
-            console.group("image analysing");
-            console.log(info);
-            // using pixel arroy now
-
-            // SET UP BASICS
-            backgroundColor = getBackgroundColorFromTwoColors(pixels);
-            console.log("recognized background color (rgb): " + backgroundColor);
-
-            // GET X CROPS AND SAFE
-            let xCrops = getXCrops(backgroundColor, pixels);
-            // deleting temp folder before
-            let directory = outputDir + "/tempVerticals/";
-            fs.readdir(directory, (err, files) => {
+    await new Promise((resolve, reject) => {
+        sharp(imgPath)
+            .modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
+            .grayscale()
+            .raw()
+            .toBuffer((err, buffer, info) => {
                 if (err) throw err;
 
-                for (const file of files) {
-                    fs.unlink(path.join(directory, file), (err) => {
-                        if (err) throw err;
-                    })
+                // `buffer` enthält das rohe Pixelarray
+                const pixels = [];
+
+                for (let i = 0; i < info.height; i++) {
+                    const row = [];
+                    for (let j = 0; j < info.width; j++) {
+                        const offset = (i * info.width + j) * info.channels;
+                        const r = buffer[offset];
+                        const g = buffer[offset + 1];
+                        const b = buffer[offset + 2];
+                        row.push({ r, g, b });
+                    }
+                    pixels.push(row);
                 }
 
-                directory = outputDir + "/tempFinals/";
+
+                console.group("image analysing");
+                console.log(info);
+                // using pixel arroy now
+
+                // SET UP BASICS
+                backgroundColor = getBackgroundColorFromTwoColors(pixels);
+                console.log("recognized background color (rgb): " + backgroundColor);
+
+                // GET X CROPS AND SAFE
+                let xCrops = getXCrops(backgroundColor, pixels);
+                // deleting temp folder before
+                let directory = outputDir + "/tempVerticals/";
                 fs.readdir(directory, (err, files) => {
                     if (err) throw err;
 
@@ -475,90 +469,116 @@ function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilledRequir
                             if (err) throw err;
                         })
                     }
-                    deletedTempDirectory();
-                });
-            })
-            if (xCrops.ends.length === 0) {
-                console.log("seems like there were no sections found");
-                console.groupEnd();
-            }
+
+                    directory = outputDir + "/tempFinals/";
+                    fs.readdir(directory, (err, files) => {
+                        if (err) throw err;
+
+                        for (const file of files) {
+                            fs.unlink(path.join(directory, file), (err) => {
+                                if (err) throw err;
+                            })
+                        }
+                        deletedTempDirectory();
+                    });
+                })
+                if (xCrops.ends.length === 0) {
+                    console.log("seems like there were no sections found");
+                    console.groupEnd();
+                }
 
 
-            function deletedTempDirectory() {
-                let verticalPaths = [];
-                for (let i = 0; i < xCrops.ends.length; ++i) {
-                    sharp(imgPath)
-                        .extract({ left: i !== 0 ? Math.ceil(xCrops.ends[i - 1]) : Math.ceil(xCrops.leftBegin), top: 0, width: i !== 0 ? (i !== xCrops.ends.length - 1 ? Math.ceil(xCrops.ends[i] - xCrops.ends[i - 1]) : Math.ceil(xCrops.rightEnd - xCrops.ends[i - 1])) : Math.ceil(xCrops.ends[0] - xCrops.leftBegin), height: info.height })
-                        .toFile(outputDir + '/tempVerticals/' + i + '.png', (err, info) => {
-                            verticalPaths.push(outputDir + '/tempVerticals/' + i + '.png');
-                            if (err) {
-                                console.log(err);
-                            } else {
-                                console.log("added " + i + '.png as vertical image part');
-                                if (i === xCrops.ends.length - 1) {
-                                    console.log("finished vertical cropping, now cropping all letters off of already cropped vertical parts");
-                                    console.groupEnd();
-                                    // LAST --> FINISH in other function
-                                    finish();
-                                }
-                                //console.log(info);
-                            }
+                async function deletedTempDirectory() {
+                    let verticalPaths = [];
+                    for (let i = 0; i < xCrops.ends.length; ++i) {
+                        await new Promise((resolve, reject) => {
+                            sharp(imgPath)
+                                .extract({ left: i !== 0 ? Math.ceil(xCrops.ends[i - 1]) : Math.ceil(xCrops.leftBegin), top: 0, width: i !== 0 ? (i !== xCrops.ends.length - 1 ? Math.ceil(xCrops.ends[i] - xCrops.ends[i - 1]) : Math.ceil(xCrops.rightEnd - xCrops.ends[i - 1])) : Math.ceil(xCrops.ends[0] - xCrops.leftBegin), height: info.height })
+                                .toFile(outputDir + '/tempVerticals/' + i + '.png', async (err, info) => {
+                                    verticalPaths.push(outputDir + '/tempVerticals/' + i + '.png');
+                                    if (err) {
+                                        console.log(err);
+                                    } else {
+                                        console.log("added " + i + '.png as vertical image part');
+                                        if (i === xCrops.ends.length - 1) {
+                                            console.log("finished vertical cropping, now cropping all letters off of already cropped vertical parts");
+                                            console.groupEnd();
+                                            // LAST --> FINISH in other function
+                                            await finish();
+                                            resolve();
+                                        } else {
+                                            resolve();
+                                        }
+                                        //console.log(info);
+                                    }
+                                });
                         });
-                }
+                    }
+                    resolve();
 
-                function finish() {
-                    // GET Y CROPS AND SAFE
-                    let yCrops = getYCrops(backgroundColor, pixels);
-                    finishWithXCrops(verticalPaths, yCrops);
+                    async function finish() {
+                        // GET Y CROPS AND SAFE
+                        let yCrops = getYCrops(backgroundColor, pixels);
+                        await finishWithXCrops(verticalPaths, yCrops);
+                    }
                 }
-            }
-        });
+            });
+    });
+    return;
 
-    function finishWithXCrops(paths, yCrops) {
+
+
+
+
+
+    async function finishWithXCrops(paths, yCrops) {
         let allPathsLength = paths.length;
         for (let i = 0; i < paths.length; ++i) {
             let myPath = paths[i];
-            sharp(myPath)
-                .modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
-                .grayscale()
-                .raw()
-                .toBuffer((err, buffer, info) => {
-                    if (err) throw err;
+            await new Promise((resolve, reject) => {
+                sharp(myPath)
+                    .modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
+                    .grayscale()
+                    .raw()
+                    .toBuffer((err, buffer, info) => {
+                        if (err) throw err;
 
-                    // `buffer` enthält das rohe Pixelarray
-                    const pixels = [];
+                        // `buffer` enthält das rohe Pixelarray
+                        const pixels = [];
 
-                    for (let i = 0; i < info.height; i++) {
-                        const row = [];
-                        for (let j = 0; j < info.width; j++) {
-                            const offset = (i * info.width + j) * info.channels;
-                            const r = buffer[offset];
-                            const g = buffer[offset + 1];
-                            const b = buffer[offset + 2];
-                            row.push({ r, g, b });
+                        for (let i = 0; i < info.height; i++) {
+                            const row = [];
+                            for (let j = 0; j < info.width; j++) {
+                                const offset = (i * info.width + j) * info.channels;
+                                const r = buffer[offset];
+                                const g = buffer[offset + 1];
+                                const b = buffer[offset + 2];
+                                row.push({ r, g, b });
+                            }
+                            pixels.push(row);
                         }
-                        pixels.push(row);
-                    }
 
-                    //  console.log("cropping now vertical section of: " + myPath);
+                        //  console.log("cropping now vertical section of: " + myPath);
 
-                    // using pixel arroy now
-                    let splitPath = myPath.split("/");
-                    let myPartNum = Number(splitPath[splitPath.length - 1].split(".")[0]);
+                        // using pixel arroy now
+                        let splitPath = myPath.split("/");
+                        let myPartNum = Number(splitPath[splitPath.length - 1].split(".")[0]);
 
-                    for (let i = 0; i < yCrops.ends.length; ++i) {
-                        let toFile = outputDir + '/tempFinals/' + ((i) * allPathsLength + (myPartNum + 1)) + '.png'; // calculate number in query ...
-                        sharp(myPath)
-                            .extract({ left: 0, top: i !== 0 ? Math.ceil(yCrops.ends[i - 1]) : yCrops.topBegin, width: info.width, height: i !== 0 ? (i !== yCrops.ends.length - 1 ? Math.ceil(yCrops.ends[i] - yCrops.ends[i - 1]) : Math.ceil(yCrops.bottomEnd - yCrops.ends[i - 1])) : Math.ceil(yCrops.ends[0] - yCrops.topBegin) })
-                            .toFile(toFile, (err, info) => {
-                                if (err) {
-                                    console.log(err);
-                                } else {
-                                    //  console.log("added as final image part: " + toFile);
-                                }
-                            });
-                    }
-                });
+                        for (let i = 0; i < yCrops.ends.length; ++i) {
+                            let toFile = outputDir + '/tempFinals/' + ((i) * allPathsLength + (myPartNum + 1)) + '.png'; // calculate number in query ...
+                            sharp(myPath)
+                                .extract({ left: 0, top: i !== 0 ? Math.ceil(yCrops.ends[i - 1]) : yCrops.topBegin, width: info.width, height: i !== 0 ? (i !== yCrops.ends.length - 1 ? Math.ceil(yCrops.ends[i] - yCrops.ends[i - 1]) : Math.ceil(yCrops.bottomEnd - yCrops.ends[i - 1])) : Math.ceil(yCrops.ends[0] - yCrops.topBegin) })
+                                .toFile(toFile, (err, info) => {
+                                    if (err) {
+                                        console.log(err);
+                                    } else {
+                                        //  console.log("added as final image part: " + toFile);
+                                    }
+                                    resolve();
+                                });
+                        }
+                    });
+            });
         }
     }
 
