@@ -401,9 +401,15 @@ async function myAsyncLoad() {
 
 const sharp = require('sharp');
 
-seperateLettersFromGrid("./puzzles/wordsearch.PNG", 1 / 10, 1 / 10, 50, 4); // second 1/6 eig
-function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff) {
 
+
+
+
+
+
+
+seperateLettersFromGrid("./puzzles/wordsearch.png", 1 / 10, 1 / 10, 50, 4); // second (number param) 1/6 before
+function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff) {
     let backgroundColor;
     let imgPath = grid;
     sharp(imgPath)
@@ -554,14 +560,60 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
 
     function countMostOftenOccurrences(arr) {
         var counts = {};
-        var result = [];
 
         for (var i = 0; i < arr.length; i++) {
             var num = arr[i];
-            counts[num] = counts[num] ? counts[num] + 1 : 1;
+            for (let j = -1; j < 2; ++j) {
+                counts[num + j] = counts[num + j] ? counts[num + j] + 1 : 1 // count key --> streaksNum, value --> how often does the streak occur (with a tolerance of 1)
+            }
+            //counts[num] = counts[num] ? counts[num] + 1 : 1;
         }
 
-        let biggestCount = 0;
+        //console.log(counts)
+        //console.log(peaksFromObj(counts));
+        let peaks = peaksFromObj(counts);
+        function peaksFromObj(obj) {
+            const keys = Object.keys(obj);
+
+            const peaks = keys.filter((key, index) => {
+                if (keys.length === 2) {
+                    return true;
+                }
+                if (index === 0 || index === keys.length - 1) {
+                    return false;
+                }
+
+                const prevKey = keys[index - 1];
+                const nextKey = keys[index + 1];
+                const prevVal = obj[prevKey];
+                const currVal = obj[key];
+                const nextVal = obj[nextKey];
+
+                if (prevVal === currVal && currVal === nextVal) {
+                    return false; // exclude plateau
+                }
+
+                if (currVal > prevVal && currVal > nextVal) {
+                    return true; // peak found
+                }
+
+                // check if there's a plateau
+                if (prevVal === currVal && currVal > nextVal) {
+                    let i = index + 1;
+                    while (i < keys.length && obj[keys[i]] === currVal) {
+                        i++;
+                    }
+                    if (i < keys.length && obj[keys[i]] < currVal) {
+                        return true; // plateau followed by a drop
+                    }
+                }
+
+                return false;
+            });
+            return peaks.map(Number);
+        }
+
+        /*let biggestCount = 0;
         let resNum = 0;
         for (var num in counts) {
             if (counts[num] > biggestCount) {
@@ -569,9 +621,11 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                 resNum = num;
             }
             result.push([Number(num), counts[num]]);
-        }
+        }*/
 
-        return [Number(resNum), biggestCount];
+        let resKey = Math.max(...peaks); // key standing for the most often occurring streak with a tolerance of 1, not the count, but the streak-length itself (biggest one)
+        let accordingCount = counts[resKey]; // not really needed as return value yet
+        return [resKey, accordingCount]; //
     }
 
 
@@ -748,6 +802,310 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
         const bDiff = color1[2] - color2[2];
         return Math.sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    //createRidgedVersion("./puzzles/wordsearch6.PNG","./ridgedOutput.png");
+    function createRidgedVersion(path, outputPath) {
+        sharp(path)
+            .raw()
+            .toBuffer((err, buffer, info) => {
+                if (err) throw err;
+                let pixels = getPixelArrayXY(buffer, info); // convert to XY - array [x][y]
+                pixels = convolutionMatrix(info, [0, -1, 0, -1, 4, -1, 0, -1, 0], 100, 1, 1, false, false, pixels) // use convolution matrix on it (ridge detecten 3x3), color addent 100, ...
+    
+                // convert back using XY - array type
+                let imageData = XYToImageData(pixels, info);
+    
+                // Speichern Sie das Image Data Objekt als Bild
+                sharp(imageData.data, {
+                    raw: {
+                        width: imageData.width,
+                        height: imageData.height,
+                        channels: info.channels // RGBA-Farbraum
+                    }
+                }).toFile(outputPath, (err, info) => {
+                    if (err) {
+                        console.log(err);
+                    } else {
+                        console.log("created image with ridge detected (3x3)");
+                    }
+                });
+            });
+    }
+
+    function getPixelArrayXY(buffer, info) {
+        let width = info.width;
+        let height = info.height;
+        let channels = info.channels;
+    
+        const pixelArr = [];
+        for (let x = 0; x < width; x++) {
+            const column = [];
+            for (let y = 0; y < height; y++) {
+                const offset = (y * width + x) * channels;
+                const pixel = {
+                    r: buffer[offset],
+                    g: buffer[offset + 1],
+                    b: buffer[offset + 2],
+                    a: buffer[offset + 3]
+                };
+                column.push(pixel);
+            }
+            pixelArr.push(column);
+        }
+        return pixelArr;
+    } // in the right order ... [x][y]  ... --> needs to be reverted righty back!
+    function XYToImageData(pixels, info) {
+        let width = pixels.length;
+        let height = pixels[0].length;
+        const imageData = {
+            data: new Uint8ClampedArray(width * height * info.channels),
+            width: width,
+            height: height
+        };
+    
+        for (let i = 0; i < width; i++) {
+            for (let j = 0; j < height; j++) {
+                const pixel = pixels[i][j];
+                const offset = (j * info.width + i) * info.channels
+                imageData.data[offset] = pixel.r;
+                imageData.data[offset + 1] = pixel.g;
+                imageData.data[offset + 2] = pixel.b;
+                imageData.data[offset + 3] = 255;
+            }
+        }
+        return imageData;
+    }
+    
+    function convolutionMatrix(originalPicture, pattern, colorAddend, matrixDivisor, times, median, pixelating, pixelArray) {
+    
+        let patternSqrt_y0_p = 0;
+        for (let t = 0; t < times; t++) {
+            if (Math.sqrt(pattern.length) % 1 !== 0 || (Math.sqrt(pattern.length)) % 2 !== 1) {
+                System.out.println("Error: square of 'length of 'pattern'' is a decimal OR square of 'length of 'pattern'' is even");
+                return null;
+            }
+            let patternSqrt = parseInt(Math.sqrt(pattern.length));
+            let offset;
+            if (pixelating) {
+                offset = patternSqrt; //((patternSqrt-1)/2) + 1 +((patternSqrt-1)/2) + 1;
+            } else {
+                offset = 1;
+            }
+    
+            let width = originalPicture.width;
+            let height = originalPicture.height;
+            pixel = pixelArray;
+            pixelNew = twoDimensionalArr(width, height);
+            let patternSqrt_xy0 = (patternSqrt - (patternSqrt - 1) / 2) - 1; // allererster Pixel x, y der für die Matrix-Filter-Größe in Betracht kommt
+            let patternSqrt_x0_p = 0; // Deklarierung und erste Initialisierung des Start-x-Pixels für jeden Filterblock eines Pixels (in dem Fall natürlich für den ersten betrachteten Pixel)
+            for (let x = patternSqrt_xy0; x + (patternSqrt - 1) / 2 < width; x += offset) { // Prozedere für jeden Pixel für den der Filter anwenndbar ist
+                patternSqrt_y0_p = 0;
+                for (let y = patternSqrt_xy0; y + (patternSqrt - 1) / 2 < height; y += offset) {
+                    let sumR = 0;
+                    let sumG = 0;
+                    let sumB = 0;
+                    let counter = 0;
+                    if (median) {
+                        let pixelFilterR = new Array(pattern.length);
+                        let pixelFilterG = new Array(pattern.length);
+                        let pixelFilterB = new Array(pattern.length);
+                        for (let x1 = 0; x1 < patternSqrt; x1++) { // einzelne Pixel innerhalb der Reichweite des Filters anschauen, um damit den Farbwert des neuen zu bestimmen
+                            for (let y1 = 0; y1 < patternSqrt; y1++) {
+                                pixelFilterR[counter] = pixel[patternSqrt_x0_p + x1][patternSqrt_y0_p + y1].r * pattern[counter]; // normalerweise immer 1
+                                pixelFilterG[counter] = pixel[patternSqrt_x0_p + x1][patternSqrt_y0_p + y1].g * pattern[counter];
+                                pixelFilterB[counter] = pixel[patternSqrt_x0_p + x1][patternSqrt_y0_p + y1].b * pattern[counter];
+                                counter += 1;
+                            }
+                        }
+                        pixelFilterR.sort();
+                        pixelFilterG.sort();
+                        pixelFilterB.sort();
+                        sumR = parseInt(pixelFilterR[(pattern.length - 1) / 2 + 1]);
+                        sumG = parseInt(pixelFilterG[(pattern.length - 1) / 2 + 1]);
+                        sumB = parseInt(pixelFilterB[(pattern.length - 1) / 2 + 1]);
+                    } else {
+                        for (let x1 = 0; x1 < patternSqrt; x1++) { // einzelne Pixel innerhalb der Reichweite des Filters anschauen, um damit den Farbwert des neuen zu bestimmen
+                            for (let y1 = 0; y1 < patternSqrt; y1++) {
+                                sumR += pixel[patternSqrt_x0_p + x1][patternSqrt_y0_p + y1].r * pattern[counter];
+                                sumG += pixel[patternSqrt_x0_p + x1][patternSqrt_y0_p + y1].g * pattern[counter];
+                                sumB += pixel[patternSqrt_x0_p + x1][patternSqrt_y0_p + y1].b * pattern[counter];
+                                //console.log("worked");
+                                counter += 1;
+                            }
+                        }
+    
+                        sumR = parseInt((sumR / (matrixDivisor) + colorAddend));
+                        sumG = parseInt((sumG / (matrixDivisor) + colorAddend));
+                        sumB = parseInt((sumB / (matrixDivisor) + colorAddend));
+                        if (sumR < 0) {
+                            sumR = 0;
+                        } else if (sumR > 255) {
+                            sumR = 255;
+                        }
+                        if (sumG < 0) {
+                            sumG = 0;
+                        } else if (sumG > 255) {
+                            sumG = 255;
+                        }
+                        if (sumB < 0) {
+                            sumB = 0;
+                        } else if (sumB > 255) {
+                            sumB = 255;
+                        }
+                    }
+                    pixelNew[x][y] = { "r": sumR, "g": sumG, "b": sumB };
+    
+                    if (pixelating) {
+                        for (let x1 = 0; x1 < patternSqrt; x1++) { // jeden Pixel im Filter auf den Ergebniswert setzen, wenn pixelating == true
+                            for (let y1 = 0; y1 < patternSqrt; y1++) {
+                                pixelNew[patternSqrt_x0_p + x1][patternSqrt_y0_p + y1] = {
+                                    "r": sumR,
+                                    "g": sumG,
+                                    "b": sumB
+                                };
+                            }
+                        }
+                    }
+                    patternSqrt_y0_p += offset; // ""
+                }
+                patternSqrt_x0_p += offset; // "Start-x-Pixel für jeden "Filterblock" um 1 weiterschieben; keine ganz neue Berechnung nötig
+    
+            }
+    
+            if (!pixelating) {
+                for (let m = 0; m < 2; m++) { // alle Ränder bestimmen mit nahem bestimmtem Farbwert
+                    let fTP = patternSqrt_xy0; // "firstTopPixel_YPOS" --> bezieht sich auf die bereits gesetzte Pixel nach der Filteranwendung
+                    let fBP = height - 1 - patternSqrt_xy0;
+                    let fLP = patternSqrt_xy0; //"firstLeftPixel_XPOS"
+                    let fRP = width - 1 - patternSqrt_xy0;
+                    for (let n = 0; n < 2; n++) { // System von 1 und 0 benutzt, ähnlich zu if Abfragen: wenn m = 0 --> 0+x<- ; m = 1 --> 1*(y-x)+x --> y<-
+                        for (let x = 0; x < m * (width - fLP) + fLP; x++) {
+                            for (let y = 0; y < m * (fTP - height) + height; y++) {
+                                if (y < fTP && m === 0) { // Unterscheidungen: pixel über bzw. unter dem höchsten bestimmten filterbasierten Pixel müssen durch den naheliegensten bestimmten Pixel bestimmt werden
+                                    pixelNew[n * (fRP + 1) + x][y] = { "r": pixelNew[n * (fRP - fLP) + fLP][fTP].r, "g": pixelNew[n * (fRP - fLP) + fLP][fTP].g, "b": pixelNew[n * (fRP - fLP) + fLP][fTP].b };
+                                } else if (m * (x - y) + y <= m * (fRP - fBP) + fBP) {
+                                    if (m === 0) {
+                                        pixelNew[n * (fRP + 1) + x][y] = { "r": pixelNew[n * (fRP - fLP) + fLP][y].r, "g": pixelNew[n * (fRP - fLP) + fLP][y].g, "b": pixelNew[n * (fRP - fLP) + fLP][y].b };
+                                    } else {
+                                        pixelNew[x][n * (fBP + 1) + y] = { "r": pixelNew[x][n * (fBP - fTP) + fTP].r, "g": pixelNew[x][n * (fBP - fTP) + fTP].g, "b": pixelNew[x][n * (fBP - fTP) + fTP].b };
+                                    }
+                                } else if (m === 0) {
+                                    pixelNew[n * (fRP + 1) + x][y] = { "r": pixelNew[n * (fRP - fLP) + fLP][fBP].r, "g": pixelNew[n * (fRP - fLP) + fLP][fBP].g, "b": pixelNew[n * (fRP - fLP) + fLP][fBP].b };
+                                }
+                            }
+                        }
+                    }
+                }
+            } else { // Pixelblöcke am Rand erzeugen
+                let fBP = patternSqrt_y0_p;
+                //System.out.println("fBP = "+fBP);
+                let fRP = patternSqrt_x0_p;
+                let counter = 0;
+                for (let n = 0; n < 2; ++n) {
+                    if (fBP + n * (-fBP + fRP) !== height + n * (-height + width)) {
+                        for (let x = 0; x < width / offset + n * ((-width / offset) + height / offset); ++x) { // x nicht immer für x bedeutend --> 0, 1 System für beide Ränder angewandt -- wahrscheinlich unübersichtlicher und ineffizienter als 2-Versionen davon zu schreiben, jedoch kürzer im Code
+                            let sumR = 0;
+                            let sumG = 0;
+                            let sumB = 0;
+                            for (let x1 = x * offset + n * ((-(x * offset)) + fRP); x1 < x * offset + offset + n * ((-(x * offset + offset)) + width); ++x1) {
+                                for (let y1 = fBP + n * ((-fBP) + x * offset); y1 < height + n * ((-height) + x * offset + offset); ++y1) {
+                                    sumR += pixel[x1][y1].r;
+                                    sumG += pixel[x1][y1].g;
+                                    sumB += pixel[x1][y1].b;
+                                    counter += 1;
+                                }
+                            }
+                            sumR /= counter;
+                            sumG /= counter;
+                            sumB /= counter;
+                            counter = 0;
+                            /*
+                            for (int x1 = x*offset; x1 < x*offset+offset; ++x1) {
+                            for (int y1 = fBP; y1 < height; ++y1) {
+                            pixelNew[x1][y1] = new Color(sumR,sumG,sumB);
+                            }
+                            }*/
+                            for (let x1 = x * offset + n * ((-(x * offset)) + fRP); x1 < x * offset + offset + n * ((-(x * offset + offset)) + width); ++x1) {
+                                for (let y1 = fBP + n * ((-fBP) + x * offset); y1 < height + n * ((-height) + x * offset + offset); ++y1) {
+                                    pixelNew[x1][y1] = { "r": sumR, "g": sumG, "b": sumB };
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+    
+            /*for (int x = 0; x < width; x++) { // Überprüfungsmethode ob wirklich die ganze Liste von pixelNew gefüllt ist
+            for (int y = 0; y < height; y++) {
+            if (pixelNew[x][y]== null) {
+            System.out.println("null found at x= "+x+"; y= "+y);
+            }
+            }
+            }*/
+    
+            // OTHER CONCEPT IN JS
+            //newPicture.setPixelArray(pixelNew);
+            //originalPicture = newPicture;
+            // TO
+            pixelArray = pixelNew; // setting pixel array instead of picture class --> not used in js, just handling imag data via info, which is consistent and pixelarray, which gets changed
+        }
+        //return (einPixel.graustufenNatuerlich(einPixel.invertieren(newPicture))); // wenn man wollte könnte man zusätlich das entstandene Bild invertieren etc. über klassenübergreifende Methoden
+        // OTHER CONCEPT IN JS
+        //return (newPicture);
+        return (pixelNew); // returning pixelArray instead of Picture class object
+    
+    
+    
+        function twoDimensionalArr(width, height) {
+            let pixels = [];
+            for (let i = 0; i < width; i++) {
+                const column = [];
+                for (let j = 0; j < height; j++) {
+                    const r = 0;
+                    const g = 0;
+                    const b = 0;
+                    column.push({
+                        r,
+                        g,
+                        b
+                    });
+                }
+                pixels.push(column);
+            }
+            return pixels;
+        }
+    } // old function migrated from java to js, had problems using sharps .convolve
 } // min max inclusive
 
 
@@ -788,7 +1146,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
 const Tesseract = require('tesseract.js'); // Tesseract requires internet connection
 
 Tesseract.recognize(
-    './320.png',
+    './o.PNG',
     'eng',
     { logger: m => console.log(m) }
   ).then(({ data: { text } }) => {
