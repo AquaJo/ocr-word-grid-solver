@@ -408,7 +408,7 @@ const sharp = require('sharp');
 
 
 
-seperateLettersFromGrid("./puzzles/wordsearch.png", 1 / 10, 1 / 10, 50, 4); // second (number param) 1/6 before
+seperateLettersFromGrid("./puzzles/medianandridge3x3100addent.jpg", 1 / 10, 1 / 10, 50, 4); // second (number param) 1/6 before
 function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff) {
     let backgroundColor;
     let imgPath = grid;
@@ -468,22 +468,24 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                     deletedTempDirectory();
                 });
             })
-            if (xCrops.length === 0) {
+            if (xCrops.ends.length === 0) {
                 console.log("seems like there were no sections found");
                 console.groupEnd();
             }
+
+
             function deletedTempDirectory() {
                 let verticalPaths = [];
-                for (let i = 0; i < xCrops.length; ++i) {
+                for (let i = 0; i < xCrops.ends.length; ++i) {
                     sharp(imgPath)
-                        .extract({ left: i !== 0 ? Math.ceil(xCrops[i - 1]) : 0, top: 0, width: i !== 0 ? Math.ceil(xCrops[i] - xCrops[i - 1]) : Math.ceil(xCrops[0]), height: info.height })
+                        .extract({ left: i !== 0 ? Math.ceil(xCrops.ends[i - 1]) : Math.ceil(xCrops.leftBegin), top: 0, width: i !== 0 ? (i !== xCrops.ends.length - 1 ? Math.ceil(xCrops.ends[i] - xCrops.ends[i - 1]) : Math.ceil(xCrops.rightEnd - xCrops.ends[i - 1])) : Math.ceil(xCrops.ends[0] - xCrops.leftBegin), height: info.height })
                         .toFile('./tempVerticals/' + i + '.png', (err, info) => {
                             verticalPaths.push('./tempVerticals/' + i + '.png');
                             if (err) {
                                 console.log(err);
                             } else {
                                 console.log("added " + i + '.png as vertical image part');
-                                if (i === xCrops.length - 1) {
+                                if (i === xCrops.ends.length - 1) {
                                     console.log("finished vertical cropping, now cropping all letters off of already cropped vertical parts");
                                     console.groupEnd();
                                     // LAST --> FINISH in other function
@@ -534,10 +536,10 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                     let splitPath = myPath.split("/");
                     let myPartNum = Number(splitPath[splitPath.length - 1].split(".")[0]);
 
-                    for (let i = 0; i < yCrops.length; ++i) {
+                    for (let i = 0; i < yCrops.ends.length; ++i) {
                         let toFile = './tempFinals/' + ((i) * allPathsLength + (myPartNum + 1)) + '.png'; // calculate number in query ...
                         sharp(myPath)
-                            .extract({ left: 0, top: i !== 0 ? Math.ceil(yCrops[i - 1]) : 0, width: info.width, height: i !== 0 ? Math.ceil(yCrops[i] - yCrops[i - 1]) : Math.ceil(yCrops[0]) })
+                            .extract({ left: 0, top: i !== 0 ? Math.ceil(yCrops.ends[i - 1]) : yCrops.topBegin, width: info.width, height: i !== 0 ? (i !== yCrops.ends.length - 1 ? Math.ceil(yCrops.ends[i] - yCrops.ends[i - 1]) : Math.ceil(yCrops.bottomEnd - yCrops.ends[i - 1])) : Math.ceil(yCrops.ends[0] - yCrops.topBegin) })
                             .toFile(toFile, (err, info) => {
                                 if (err) {
                                     console.log(err);
@@ -660,8 +662,21 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
             //colors.push([pixels[y][x].r, pixels[y][x].g, pixels[y][x].b]);
         }
         let mostOften = countMostOftenOccurrences(firstItemsOfArr(streaks));
+        let firstStreakSpacing;
+        let lastStreakSpacing;
         let streakYEnds = getResultingStreakYEnds();
-        return streakYEnds;
+        let resStart = streaks[0][2] - firstStreakSpacing;
+        let resEnd = streaks[streaks.length - 1][1] + lastStreakSpacing;
+
+        // if resStart || resEnd lies in image persist, else change
+        if (resStart < 0) {
+            resStart = 0;
+        }
+        if (resEnd > pixels.length - 1) {
+            resEnd = pixels.length - 1;
+        }
+        return { "ends": streakYEnds, "topBegin": resStart, "bottomEnd": resEnd };
+
         function getResultingStreakYEnds() {
             let res = [];
             let finalStreaks = [];
@@ -672,7 +687,13 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
             }
             for (let i = 0; i < finalStreaks.length; ++i) {
                 if (i !== finalStreaks.length - 1) {
-                    res.push(finalStreaks[i][1] + (finalStreaks[i + 1][2] - finalStreaks[i][1]) / 2); // + (end to start) / 2
+                    let spacing = (finalStreaks[i + 1][2] - finalStreaks[i][1]) / 2;
+                    if (i === 0) {
+                        firstStreakSpacing = spacing;
+                    } else if (i === finalStreaks.length - 2) {
+                        lastStreakSpacing = spacing;
+                    }
+                    res.push(finalStreaks[i][1] + spacing); // + (end to start) / 2
                 } else {
                     res.push(finalStreaks[i][1]);
                 }
@@ -727,8 +748,20 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
 
         let mostOften = countMostOftenOccurrences(firstItemsOfArr(streaks));
         console.log(mostOften);
+        let firstStreakSpacing;
+        let lastStreakSpacing;
         let streakXEnds = getResultingStreakXEnds();
-        return streakXEnds;
+        let resStart = streaks[0][2] - firstStreakSpacing;
+        let resEnd = streaks[streaks.length - 1][1] + lastStreakSpacing;
+
+        // if resStart || resEnd lies in image persist, else change
+        if (resStart < 0) {
+            resStart = 0;
+        }
+        if (resEnd > pixels[0].length - 1) {
+            resEnd = pixels[0].length - 1;
+        }
+        return { "ends": streakXEnds, "leftBegin": resStart, "rightEnd": resEnd };
         function getResultingStreakXEnds() {
             let res = [];
             let finalStreaks = [];
@@ -739,7 +772,13 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
             }
             for (let i = 0; i < finalStreaks.length; ++i) {
                 if (i !== finalStreaks.length - 1) {
-                    res.push(finalStreaks[i][1] + (finalStreaks[i + 1][2] - finalStreaks[i][1]) / 2); // + (end to start) / 2
+                    let spacing = (finalStreaks[i + 1][2] - finalStreaks[i][1]) / 2;
+                    if (i === 0) {
+                        firstStreakSpacing = spacing;
+                    } else if (i === finalStreaks.length - 2) {
+                        lastStreakSpacing = spacing;
+                    }
+                    res.push(finalStreaks[i][1] + spacing); // + (end to start) / 2
                 } else {
                     res.push(finalStreaks[i][1]);
                 }
@@ -833,7 +872,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
 
 
 
-    
+
     //createRidgedVersion("./puzzles/wordsearch6.PNG","./ridgedOutput.png");
     function createRidgedVersion(path, outputPath) {
         sharp(path)
@@ -842,10 +881,10 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                 if (err) throw err;
                 let pixels = getPixelArrayXY(buffer, info); // convert to XY - array [x][y]
                 pixels = convolutionMatrix(info, [0, -1, 0, -1, 4, -1, 0, -1, 0], 100, 1, 1, false, false, pixels) // use convolution matrix on it (ridge detecten 3x3), color addent 100, ...
-    
+
                 // convert back using XY - array type
                 let imageData = XYToImageData(pixels, info);
-    
+
                 // Speichern Sie das Image Data Objekt als Bild
                 sharp(imageData.data, {
                     raw: {
@@ -867,7 +906,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
         let width = info.width;
         let height = info.height;
         let channels = info.channels;
-    
+
         const pixelArr = [];
         for (let x = 0; x < width; x++) {
             const column = [];
@@ -893,7 +932,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
             width: width,
             height: height
         };
-    
+
         for (let i = 0; i < width; i++) {
             for (let j = 0; j < height; j++) {
                 const pixel = pixels[i][j];
@@ -906,9 +945,9 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
         }
         return imageData;
     }
-    
+
     function convolutionMatrix(originalPicture, pattern, colorAddend, matrixDivisor, times, median, pixelating, pixelArray) {
-    
+
         let patternSqrt_y0_p = 0;
         for (let t = 0; t < times; t++) {
             if (Math.sqrt(pattern.length) % 1 !== 0 || (Math.sqrt(pattern.length)) % 2 !== 1) {
@@ -922,7 +961,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
             } else {
                 offset = 1;
             }
-    
+
             let width = originalPicture.width;
             let height = originalPicture.height;
             pixel = pixelArray;
@@ -964,7 +1003,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                                 counter += 1;
                             }
                         }
-    
+
                         sumR = parseInt((sumR / (matrixDivisor) + colorAddend));
                         sumG = parseInt((sumG / (matrixDivisor) + colorAddend));
                         sumB = parseInt((sumB / (matrixDivisor) + colorAddend));
@@ -985,7 +1024,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                         }
                     }
                     pixelNew[x][y] = { "r": sumR, "g": sumG, "b": sumB };
-    
+
                     if (pixelating) {
                         for (let x1 = 0; x1 < patternSqrt; x1++) { // jeden Pixel im Filter auf den Ergebniswert setzen, wenn pixelating == true
                             for (let y1 = 0; y1 < patternSqrt; y1++) {
@@ -1000,9 +1039,9 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                     patternSqrt_y0_p += offset; // ""
                 }
                 patternSqrt_x0_p += offset; // "Start-x-Pixel für jeden "Filterblock" um 1 weiterschieben; keine ganz neue Berechnung nötig
-    
+
             }
-    
+
             if (!pixelating) {
                 for (let m = 0; m < 2; m++) { // alle Ränder bestimmen mit nahem bestimmtem Farbwert
                     let fTP = patternSqrt_xy0; // "firstTopPixel_YPOS" --> bezieht sich auf die bereits gesetzte Pixel nach der Filteranwendung
@@ -1065,7 +1104,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                     }
                 }
             }
-    
+
             /*for (int x = 0; x < width; x++) { // Überprüfungsmethode ob wirklich die ganze Liste von pixelNew gefüllt ist
             for (int y = 0; y < height; y++) {
             if (pixelNew[x][y]== null) {
@@ -1073,7 +1112,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
             }
             }
             }*/
-    
+
             // OTHER CONCEPT IN JS
             //newPicture.setPixelArray(pixelNew);
             //originalPicture = newPicture;
@@ -1084,9 +1123,9 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
         // OTHER CONCEPT IN JS
         //return (newPicture);
         return (pixelNew); // returning pixelArray instead of Picture class object
-    
-    
-    
+
+
+
         function twoDimensionalArr(width, height) {
             let pixels = [];
             for (let i = 0; i < width; i++) {
@@ -1146,7 +1185,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
 const Tesseract = require('tesseract.js'); // Tesseract requires internet connection
 
 Tesseract.recognize(
-    './o.PNG',
+    './96.png',
     'eng',
     { logger: m => console.log(m) }
   ).then(({ data: { text } }) => {
