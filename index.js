@@ -408,10 +408,20 @@ const sharp = require('sharp');
 
 
 
-seperateLettersFromGrid("./puzzles/medianandridge3x3100addent.jpg", 1 / 10, 1 / 10, 50, 4); // second (number param) 1/6 before
-function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff) {
+seperateLettersFromGrid("./puzzles/medianandridge3x3100addent.jpg", "./letterSeperator", 1 / 10, 1 / 10, 50, 4); // second (number param) 1/6 before
+function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff) {
     let backgroundColor;
     let imgPath = grid;
+
+    // create output dir and needed folders
+    createFoldersIfNeeded(outputDir + "/tempVerticals"); // works because recursive
+    createFoldersIfNeeded(outputDir + "/tempFinals");
+    function createFoldersIfNeeded(dir) {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+    }
+
     sharp(imgPath)
         .modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
         .grayscale()
@@ -446,7 +456,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
             // GET X CROPS AND SAFE
             let xCrops = getXCrops(backgroundColor, pixels);
             // deleting temp folder before
-            let directory = "./tempVerticals/";
+            let directory = outputDir + "/tempVerticals/";
             fs.readdir(directory, (err, files) => {
                 if (err) throw err;
 
@@ -456,7 +466,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                     })
                 }
 
-                directory = "./tempFinals/";
+                directory = outputDir + "/tempFinals/";
                 fs.readdir(directory, (err, files) => {
                     if (err) throw err;
 
@@ -479,8 +489,8 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                 for (let i = 0; i < xCrops.ends.length; ++i) {
                     sharp(imgPath)
                         .extract({ left: i !== 0 ? Math.ceil(xCrops.ends[i - 1]) : Math.ceil(xCrops.leftBegin), top: 0, width: i !== 0 ? (i !== xCrops.ends.length - 1 ? Math.ceil(xCrops.ends[i] - xCrops.ends[i - 1]) : Math.ceil(xCrops.rightEnd - xCrops.ends[i - 1])) : Math.ceil(xCrops.ends[0] - xCrops.leftBegin), height: info.height })
-                        .toFile('./tempVerticals/' + i + '.png', (err, info) => {
-                            verticalPaths.push('./tempVerticals/' + i + '.png');
+                        .toFile(outputDir + '/tempVerticals/' + i + '.png', (err, info) => {
+                            verticalPaths.push(outputDir + '/tempVerticals/' + i + '.png');
                             if (err) {
                                 console.log(err);
                             } else {
@@ -537,7 +547,7 @@ function seperateLettersFromGrid(grid, XFilledRequired, YFilledRequired, minBack
                     let myPartNum = Number(splitPath[splitPath.length - 1].split(".")[0]);
 
                     for (let i = 0; i < yCrops.ends.length; ++i) {
-                        let toFile = './tempFinals/' + ((i) * allPathsLength + (myPartNum + 1)) + '.png'; // calculate number in query ...
+                        let toFile = outputDir + '/tempFinals/' + ((i) * allPathsLength + (myPartNum + 1)) + '.png'; // calculate number in query ...
                         sharp(myPath)
                             .extract({ left: 0, top: i !== 0 ? Math.ceil(yCrops.ends[i - 1]) : yCrops.topBegin, width: info.width, height: i !== 0 ? (i !== yCrops.ends.length - 1 ? Math.ceil(yCrops.ends[i] - yCrops.ends[i - 1]) : Math.ceil(yCrops.bottomEnd - yCrops.ends[i - 1])) : Math.ceil(yCrops.ends[0] - yCrops.topBegin) })
                             .toFile(toFile, (err, info) => {
