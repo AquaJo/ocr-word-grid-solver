@@ -1,3 +1,6 @@
+var Canvas = require('canvas');
+const sharp = require('sharp');
+
 const fetch = require('node-fetch');
 const express = require('express');
 const app = express();
@@ -231,7 +234,6 @@ async function myAsyncLoad() {
 
 
 
-
     function sortArrByCommonality(arr) {
         let res = [];
         function isWordInFiles(arrPaths, word) {
@@ -399,17 +401,21 @@ async function myAsyncLoad() {
 
 
 
-const sharp = require('sharp');
+
+//const Tesseract = require('tesseract.js'); // Tesseract requires internet connection (first time)
+
+const { createWorker } = require('tesseract.js');
 
 
 
-
-
+var OCRAD = require('./ocrad.js');
 
 
 test();
 async function test() {
-    await seperateLettersFromGrid("./puzzles/background4.png", "./letterSeperator", 1 / 10, 1 / 10, 50, 4, "ridge3x3"); // second (number param) 1/6 before
+    //await seperateLettersFromGrid("./puzzles/wordsearch3.png", "./letterSeperator", 1 / 20, 1 / 30, 90, 4 * 4, "none"); // second (number param) 1/6 before // instead 35 was 50
+    await seperateLettersFromGrid("./puzzles/backgroundPuzzle.png", "./letterSeperator", 1 / 30, 1 / 30, 90, 4 * 4, "none"); // second (number param) 1/6 before // instead 35 was 50
+    getLettersFromImages("./letterSeperator/tempFinals");
 }
 
 async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff, filter) {
@@ -426,7 +432,7 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
     }
 
     console.group("image analysing");
-    if (filter === "ridge3x3") {
+    if (filter !== "none") {
         console.log("using ridge detection filter");
         await useFilter(imgPath, outputDir + "/filteredImage.png", filter); // png
         console.log("filtering done, starting splitting");
@@ -435,22 +441,26 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
 
     await new Promise((resolve, reject) => {
         sharp(imgPath)
-            .modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
+            //.modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
             .grayscale()
             .raw()
-            .toBuffer((err, buffer, info) => {
+            .toBuffer(async (err, buffer, info) => {
                 if (err) throw err;
 
                 // `buffer` enthält das rohe Pixelarray
                 const pixels = [];
 
-                for (let i = 0; i < info.height; i++) {
+                for (let i = 0; i < info.height; i++) { // read each pixel while already greyscaling it
                     const row = [];
                     for (let j = 0; j < info.width; j++) {
                         const offset = (i * info.width + j) * info.channels;
-                        const r = buffer[offset];
-                        const g = buffer[offset + 1];
-                        const b = buffer[offset + 2];
+                        let r = buffer[offset];
+                        let g = buffer[offset + 1];
+                        let b = buffer[offset + 2];
+                        let gray = (r + g + b) / 3;
+                        r = gray;
+                        g = gray;
+                        b = gray;
                         row.push({ r, g, b });
                     }
                     pixels.push(row);
@@ -463,7 +473,23 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
                 // SET UP BASICS
                 backgroundColor = getBackgroundColorFromTwoColors(pixels);
                 console.log("recognized background color (rgb): " + backgroundColor);
-
+                // Example usage
+                const backgroundMoreTo = isColorCloserToWhiteOrBlack(backgroundColor); // "closer to black"
+                if (backgroundMoreTo === "black") {
+                    console.log("background is closer to black, will need to invert image");
+                    await new Promise((resolve, reject) => {
+                        sharp(imgPath)
+                            //.modulate({ brightness: 1.2, saturation: 1.2, hue: 0 })
+                            .grayscale()
+                            .negate({ alpha: false })
+                            .toFile(outputDir + "/inverted.png", function (err) {
+                                if (err) throw err;
+                                console.log("inverted");
+                                imgPath = outputDir + "/inverted.png";
+                                resolve();
+                            })
+                    });
+                }
                 // GET X CROPS AND SAFE
                 let xCrops = getXCrops(backgroundColor, pixels);
                 // deleting temp folder before
@@ -533,6 +559,18 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
             });
     });
     return;
+    function isColorCloserToWhiteOrBlack(rgbColor) {
+        const red = rgbColor[0];
+        const green = rgbColor[1];
+        const blue = rgbColor[2];
+
+        const grayscale = 0.2989 * red + 0.5870 * green + 0.1140 * blue;
+
+        const brightness = (red + green + blue) / 3;
+
+        return brightness > 128 ? 'white' : 'black';
+    }
+
 
 
 
@@ -732,7 +770,7 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
                     finalStreaks.push(streaks[i]);
                 }
             }
-            console.log("found "+finalStreaks.length+" streaks after similarity streak check");
+            console.log("found " + finalStreaks.length + " streaks after similarity streak check");
             for (let i = 0; i < finalStreaks.length; ++i) {
                 if (i !== finalStreaks.length - 1) {
                     let spacing = (finalStreaks[i + 1][2] - finalStreaks[i][1]) / 2;
@@ -819,7 +857,7 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
                     finalStreaks.push(streaks[i]);
                 }
             }
-            console.log("found "+finalStreaks.length+" streaks after similarity streak check");
+            console.log("found " + finalStreaks.length + " streaks after similarity streak check");
             for (let i = 0; i < finalStreaks.length; ++i) {
                 if (i !== finalStreaks.length - 1) {
                     let spacing = (finalStreaks[i + 1][2] - finalStreaks[i][1]) / 2;
@@ -932,7 +970,9 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
                     if (err) throw err;
                     let pixels = getPixelArrayXY(buffer, info); // convert to XY - array [x][y]
                     if (filter === "ridge3x3") {
-                        pixels = convolutionMatrix(info, [0, -1, 0, -1, 4, -1, 0, -1, 0], 100, 1, 1, false, false, pixels) // use convolution matrix on it (ridge detecten 3x3), color addent 100, ...
+                        pixels = convolutionMatrix(info, [0, -1, 0, -1, 4, -1, 0, -1, 0], 100, 1, 1, false, false, pixels); // use convolution matrix on it (ridge detecten 3x3), color addent 100, ...
+                    } else if (filter === "ridge3x3_5") {
+                        pixels = convolutionMatrix(info, [0, -1, 0, -1, 5, -1, 0, -1, 0], 100, 1, 1, false, false, pixels); // use convolution matrix on it (ridge detecten 3x3), color addent 100, ...
                     }
 
                     // convert back using XY - array type
@@ -1201,7 +1241,177 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
             return pixels;
         }
     } // old function migrated from java to js, had problems using sharps .convolve
-} // min max inclusive
+} // min max inclusive // filter param pretty irrelevant --> probably also just an alpha channel thingy for using convolve --> might fix
+
+async function getLettersFromImages(dir) {
+    function sortFilenames(filename) {
+        // Split the filename into its numeric and alphabetic components
+        const parts = [];
+        let currentPart = "";
+        for (let i = 0; i < filename.length; i++) {
+            const c = filename.charAt(i);
+            if (c >= '0' && c <= '9') {
+                currentPart += c;
+            } else {
+                if (currentPart) {
+                    parts.push(parseInt(currentPart));
+                    currentPart = "";
+                }
+                parts.push(c);
+            }
+        }
+        if (currentPart) {
+            parts.push(parseInt(currentPart));
+        }
+
+        // Sort based on the components
+        return parts;
+    }
+
+    let files = fs.readdirSync(dir);
+    files = files.sort((a, b) => {
+        const partsA = sortFilenames(a);
+        const partsB = sortFilenames(b);
+        for (let i = 0; i < Math.min(partsA.length, partsB.length); i++) {
+            const result = partsA[i] - partsB[i];
+            if (result !== 0) {
+                return result;
+            }
+        }
+        return partsA.length - partsB.length;
+    });
+
+    let resTesseract = [];
+    let resOcrad = [];
+    console.log(files);
+
+
+    const worker = await createWorker();
+    //await worker.load();
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
+    await worker.setParameters({
+        tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        //psm: '10', // page segmentation mode: single character
+        psm: 10,
+        oem: 2,
+        //ocr_engine_mode: 1, // enable neural network mode
+    });
+
+    for (let i = 0; i < files.length; ++i) {
+        await new Promise(resolve => {
+
+            (async () => {
+                var Image = Canvas.Image;
+
+
+                fs.readFile(path.join(dir, files[i]), function (err, src) {
+                    if (err) {
+                        throw err;
+                    }
+                    var img = new Image();
+                    img.src = src;
+                    var canvas = new Canvas.createCanvas(img.width, img.height);
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, img.width, img.height);
+                    let text = OCRAD(canvas, {
+                        numeric: false,  // keine Zahlen
+                        punctuation: false,  // keine Satzzeichen
+                        whitespace: false,  // keine Leerzeichen
+                        uncertain: false,  // keine unsicheren Zeichen
+                    }).charAt(0);
+                    console.log("ocrad " + i);
+                    resOcrad.push(text);
+
+                    // now tessaract
+                    worker.recognize(path.join(dir, files[i])).then(({ data: { text } }) => {
+                        resTesseract.push(text.charAt(0));
+                        console.log("tesseract " + i)
+                        resolve();
+                    });
+                });
+            })();
+            /*Tesseract.recognize(
+                path.join(dir,files[i]),
+                'eng'//,
+                //{ logger: m => //console.log(m) }
+            ).then(({ data: { text } }) => {
+                console.log("finished " + i);
+                res.push(text)
+                resolve();
+            })*/
+        });
+    }
+    console.log("finished all");
+    let res = sortOutArrays(resTesseract, resOcrad);
+    console.log("compared two ocr - engines results");
+    console.log(res);
+    // compare
+    let str = "hGyRCPyxlFLPdsRkgTYZ,AYoSXsVOdehUMQCPsFPx,JulThCrFnUNkfblOagbW,bmwKqLaZVcovTswIZKJw,qKGvbyjpyjvNSdWiUgIO,wVDyTANsJaewvTGPAJUa,svXIxGHUeHdmpPQfbGrA,IFlbtTSpNDgnZZvuEQIv,ntsGWNauWUmUomROMPUx,ZYnYahZeHqTsdMuAnQec,CXgcKMGUbayrwkeSigmV,NMdZqqgxCxtDcHolmUdB,QiElqqRGpoeLAlvUdViY,bKVZPcYrSjiVQxidtdbr,pitYQnuPKdpHSxrgDQiu,TAVtaGnEHfAUIoaITQJR";
+    // str = "GCPHUFNEVAWJUAOND,RGNDTVEKUHDEARUYT,DEUONNJZEVLGEWHGT,IDMBLNEAABZLEULJT,VNERNYTIAEITKVEQR,PIPHOLPCCOGVDYDJA,EWQEOFYNBITAUHCFN,ECNSAVSUCWFNTKNJS,PNSWZPRNJSUFRLYOM,WZITVPIAACFDENOSI,TRCBYTYQLRQCGSUVS,OMUURMMEQOTALCFNS,TJRMRUAKELSAAOZXI,KBRUWRTWEIOLIOZOO,BEEMFHQQXCFZUUCON,EJNECNATSISERZRXY,COTLGSDZYDONLOUVR";
+    // Ersetze alle Kommas in der Zeichenfolge durch Leerzeichen und wandele sie in ein Array um
+    const letters = str.replace(/,/g, '').split('');
+
+    compareArrs(letters, res);
+
+
+
+
+
+
+
+
+
+
+
+    function sortOutArrays(arr1, arr2) { // tesseract , ocrad
+        let res = [];
+        for (let i = 0; i < arr1.length; i++) {
+            let i1 = arr1[i].toLowerCase();
+            let i2 = arr2[i].toLowerCase();
+            if (i1 !== i2) {
+                if (i1 === "q" || i1 === "m" || !/^[a-zA-Z]+$/.test(i2) || i2 === "x" || i2 === "a" || i2 === "g" || i2 === "x" || i2 === "n" || i2 === "b" || i2 === "w" /*|| i2 === "i"*/) { // w ()
+                    res.push(arr1[i]);
+                } else {
+                    res.push(arr2[i]);
+                }
+            } else {
+                res.push(arr1[i]);
+            }
+        }
+        return res;
+    }
+    function compareArrs(arr1, arr2) {
+        if (arr1.length === arr2.length) {
+
+            // Zwei Arrays zum Vergleich
+
+
+            // Vergleiche die Arrays und finde die unähnlichen Elemente
+            const differences = [];
+
+            for (let i = 0; i < arr1.length; i++) {
+                //console.log(arr1[i], arr2[i]);//, arr1[i].toLowerCase() !== arr2[i].toLowerCase(),i);
+                if (arr1[i].toLowerCase() !== arr2[i].toLowerCase()) {
+
+                    //if (arr1[i] !== "Q") { // without Q
+                    differences.push({ index: i, value1: arr1[i], value2: arr2[i] });
+                    // }
+                }
+            }
+
+            // Gib die unähnlichen Elemente aus
+            if (differences.length === 0) {
+                console.log("Die Arrays sind identisch.");
+            } else {
+                console.log("length of differences: " + differences.length);
+                console.log("Die Arrays sind unterschiedlich an den folgenden Indizes");
+                console.log(differences);
+            }
+        }
+
+    }
+} // letters should be black !
 
 
 
@@ -1229,22 +1439,32 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
 
 
 
+//a();
+async function a() {
 
-
-
-
-
-
-
-
-/*
-const Tesseract = require('tesseract.js'); // Tesseract requires internet connection
-
-Tesseract.recognize(
-    './96.png',
-    'eng',
-    { logger: m => console.log(m) }
-  ).then(({ data: { text } }) => {
+    const worker = await createWorker();
+    //await worker.load();
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
+    await worker.setParameters({
+        tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        //psm: '10', // page segmentation mode: single character
+        ocr_engine_mode: 1, // enable neural network mode
+    });
+    const { data: { text } } = await worker.recognize(
+        './puzzles/wordsearchHighGimp.png',
+        'eng',
+    );
     console.log(text);
-  }) // Q - Recognizing still a bit bad (!)
-*/
+    let res = [];
+
+    function isLetter(str) {
+        return str.length === 1 && str.match(/[a-z]/i);
+    }
+    let str = "hGyRCPyxlFLPdsRkgTYZ,AYoSXsVOdehUMQCPsFPx,JulThCrFnUNkfblOagbW,bmwKqLaZVcovTswIZKJw,qKGvbyjpyjvNSdWiUgIO,wVDyTANsJaewvTGPAJUa,svXIxGHUeHdmpPQfbGrA,IFlbtTSpNDgnZZvuEQIv,ntsGWNauWUmUomROMPUx,ZYnYahZeHqTsdMuAnQec,CXgcKMGUbayrwkeSigmV,NMdZqqgxCxtDcHolmUdB,QiElqqRGpoeLAlvUdViY,bKVZPcYrSjiVQxidtdbr,pitYQnuPKdpHSxrgDQiu,TAVtaGnEHfAUIoaITQJR";
+    const letters = str.replace(/,/g, '').split('');
+    compareArrs(letters, res);
+}
+
+//const Tesseract = require('tesseract.js'); // Tesseract requires internet connection
+
