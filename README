@@ -1,2 +1,3 @@
 Tool for analyzing a grid-search-puzzle, even if you don't know the words it contains.
 Analyzes diagonals, rows and cells in both directions.
+Also it has an ocr - option using tesseract.js and ocrad.js together to automatically detect letters inside the word grid.
