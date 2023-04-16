@@ -414,8 +414,8 @@ var OCRAD = require('./ocrad.js');
 test();
 async function test() {
     //await seperateLettersFromGrid("./puzzles/wordsearch3.png", "./letterSeperator", 1 / 20, 1 / 30, 90, 4 * 4, "none"); // second (number param) 1/6 before // instead 35 was 50
-    await seperateLettersFromGrid("./puzzles/backgroundPuzzle.png", "./letterSeperator", 1 / 30, 1 / 30, 90, 4 * 4, "none"); // second (number param) 1/6 before // instead 35 was 50
-    getLettersFromImages("./letterSeperator/tempFinals");
+    await seperateLettersFromGrid("./puzzles/wordsearch4.png", "./letterSeperator", 1 / 30, 1 / 30, 90, 4 * 4, "none"); // second (number param) 1/6 before // instead 35 was 50
+    await getLettersFromImages("./letterSeperator/tempFinals");
 }
 
 async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff, filter) {
@@ -656,9 +656,17 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
         let peaks = peaksFromObj(counts);
         function peaksFromObj(obj) {
             const keys = Object.keys(obj);
-
+            let sameKeys = keys[0];
+            for (let i = 0; i < keys.length; ++i) {
+                if (keys[i] !== sameKeys) {
+                    sameKeys = true;
+                    break;
+                } else if (i === keys.length - 1) {
+                    sameKeys = false;
+                }
+            }
             const peaks = keys.filter((key, index) => {
-                if (keys.length === 2) {
+                if (keys.length === 2 || sameKeys) {
                     return true;
                 }
                 if (index === 0 || index === keys.length - 1) {
@@ -830,7 +838,6 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
         }
         console.log("found x - streaks: ");
         console.log(streaks);
-
 
         let mostOften = countMostOftenOccurrences(firstItemsOfArr(streaks));
         console.log("picked the following as supposed streak-thickness for the letters with exact occurance - number: ");
@@ -1283,7 +1290,8 @@ async function getLettersFromImages(dir) {
 
     let resTesseract = [];
     let resOcrad = [];
-    console.log(files);
+    console.group("ocr - processing");
+    //console.log(files);
 
 
     const worker = await createWorker();
@@ -1320,13 +1328,15 @@ async function getLettersFromImages(dir) {
                         whitespace: false,  // keine Leerzeichen
                         uncertain: false,  // keine unsicheren Zeichen
                     }).charAt(0);
-                    console.log("ocrad " + i);
+
                     resOcrad.push(text);
 
                     // now tessaract
                     worker.recognize(path.join(dir, files[i])).then(({ data: { text } }) => {
                         resTesseract.push(text.charAt(0));
-                        console.log("tesseract " + i)
+                        if (i % 10 === 0) {
+                            console.log("completed " + i);
+                        }
                         resolve();
                     });
                 });
@@ -1342,7 +1352,7 @@ async function getLettersFromImages(dir) {
             })*/
         });
     }
-    console.log("finished all");
+    console.log("all characters analysed by tesseract.js and ocrad.js");
     let res = sortOutArrays(resTesseract, resOcrad);
     console.log("compared two ocr - engines results");
     console.log(res);
@@ -1354,6 +1364,7 @@ async function getLettersFromImages(dir) {
 
     compareArrs(letters, res);
 
+    return res;
 
 
 
@@ -1370,9 +1381,11 @@ async function getLettersFromImages(dir) {
             let i1 = arr1[i].toLowerCase();
             let i2 = arr2[i].toLowerCase();
             if (i1 !== i2) {
-                if (i1 === "q" || i1 === "m" || !/^[a-zA-Z]+$/.test(i2) || i2 === "x" || i2 === "a" || i2 === "g" || i2 === "x" || i2 === "n" || i2 === "b" || i2 === "w" /*|| i2 === "i"*/) { // w ()
+                if (i1 !== "" && (i1 === "q" || i1 === "m" || !/^[a-zA-Z]+$/.test(i2) || i2 === "x" || i2 === "a" || i2 === "g" || i2 === "n" || i2 === "b" ||i2 === "w" /*|| i2 === "i"*/)) { // w ()
                     res.push(arr1[i]);
                 } else {
+                    if (arr2[i] === "5") arr2[i] = "s";
+                    
                     res.push(arr2[i]);
                 }
             } else {
