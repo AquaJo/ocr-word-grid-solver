@@ -34,7 +34,7 @@ app.listen(3000, () => {
 
 
 //myAsyncLoad();
-async function getWordsFromGrid(strArr, rows, diagonals) {
+async function getWordsFromGrid(strArr, rows, diagonals, minWordLength) {
 
     let germanWords = [];
     let englishWords = [];
@@ -126,7 +126,7 @@ async function getWordsFromGrid(strArr, rows, diagonals) {
         let item = allPossibilities[i];
         let english = isEnglish(item);
         let german = isGerman(item);
-        if ((english || german) && item.length > 2) {
+        if ((english || german) && item.length >= minWordLength) {
             if (english && german) {
                 console.log("found eng and ger: " + item);
             } else if (german) {
@@ -146,7 +146,7 @@ async function getWordsFromGrid(strArr, rows, diagonals) {
     // sort found words by commonality
     let sort = sortArrByCommonality(foundWords);
     console.log("final array sort by commonality with the help of a shorter dictionary (some common words might still be missed in ranking by commonality): ");
-    console.log(sort);
+    console.dir(sort, { 'maxArrayLength': 999 });
     console.groupEnd()
     return sort; // !
 
@@ -430,9 +430,9 @@ async function test() {
     //await seperateLettersFromGrid("./puzzles/wordsearch3.png", "./letterSeperator", 1 / 20, 1 / 30, 90, 4 * 4, "none"); // second (number param) 1/6 before // instead 35 was 50
     let str = "hGyRCPyxlFLPdsRkgTYZ,AYoSXsVOdehUMQCPsFPx,JulThCrFnUNkfblOagbW,bmwKqLaZVcovTswIZKJw,qKGvbyjpyjvNSdWiUgIO,wVDyTANsJaewvTGPAJUa,svXIxGHUeHdmpPQfbGrA,IFlbtTSpNDgnZZvuEQIv,ntsGWNauWUmUomROMPUx,ZYnYahZeHqTsdMuAnQec,CXgcKMGUbayrwkeSigmV,NMdZqqgxCxtDcHolmUdB,QiElqgRGpoeLAlvUdViY,bKVZPcYrSjiVQxidtdbr,pitYQnuPKdpHSxrgDQiu,TAVtaGnEHfAUIoaITQJR";
     //str = "GCPHUFNEVAWJUAOND,RGNDTVEKUHDEARUYT,DEUONNJZEVLGEWHGT,IDMBLNEAABZLEULJT,VNERNYTIAEITKVEQR,PIPHOLPCCOGVDYDJA,EWQEOFYNBITAUHCFN,ECNSAVSUCWFNTKNJS,PNSWZPRNJSUFRLYOM,WZITVPIAACFDENOSI,TRCBYTYQLRQCGSUVS,OMUURMMEQOTALCFNS,TJRMRUAKELSAAOZXI,KBRUWRTWEIOLIOZOO,BEEMFHQQXCFZUUCON,EJNECNATSISERZRXY,COTLGSDZYDONLOUVR";
-    let rows = await seperateLettersFromGrid("./puzzles/wordsearch.png", "./letterSeperator", 1 / 10, 1 / 20, 90, 0.0228, "none")//,3300); // second (number param) 1/6 before // instead 35 was 50 , ....  4*8 maybe into percent of image ... (width and height)
-    let strArr = await getLettersFromImages("./letterSeperator/tempFinals", false); // images with one letter only
-    getWordsFromGrid(strArr, rows, true);
+    let rows = await seperateLettersFromGrid("./puzzles/wordsearch5.PNG", "./letterSeperator", 1 / 15, 1 / 24, 130, 0.0228, "none")//,3300); // second (number param) 1/6 before // instead 35 was 50 , ....  4*8 maybe into percent of image ... (width and height)
+    let strArr = await getLettersFromImages("./letterSeperator/tempFinals", str); // images with one letter only
+    getWordsFromGrid(strArr, rows, true, 3);
     //console.log(strArr);
 
 }
@@ -441,6 +441,7 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
     let backgroundColor;
     let imgPath = grid;
     let rows;
+    let columns;
     // create output dir and needed folders
     createFoldersIfNeeded(outputDir + "/tempVerticals"); // works because recursive
     createFoldersIfNeeded(outputDir + "/tempFinals");
@@ -576,6 +577,75 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
 
                 async function deletedTempDirectory() {
                     let verticalPaths = [];
+
+
+                    async function drawLines(xPositions, yPositions, filePath, color = [255, 255, 0]) {
+                        try {
+
+
+
+                            const image = sharp(filePath);
+                            const metadata = await image.metadata();
+                            const channels = 3;
+                            const imageData = await image.raw().toBuffer({ resolveWithObject: true });
+                            let lineWidth = metadata.height / 250;
+                            const [r, g, b] = color;
+
+
+
+
+
+                            // draw vertical lines
+                            for (let i = 0; i < xPositions.length; ++i) {
+                                const xPos = xPositions[i];
+                                for (let y = 0; y < metadata.height; y++) {
+                                    for (let j = 0; j < lineWidth; j++) {
+                                        try {
+                                            let x = xPos - (Math.ceil(lineWidth / 2)) + j;
+                                            const index = (y * metadata.width + x) * channels;
+                                            imageData.data[index] = r; // set red channel to r
+                                            imageData.data[index + 1] = g; // set green channel to g
+                                            imageData.data[index + 2] = b; // set blue channel to b
+                                        } catch (e) {
+
+                                        }
+                                    }
+                                }
+                            }
+
+                            // draw horizontal lines
+                            for (let i = 0; i < yPositions.length; ++i) {
+                                const yPos = yPositions[i];
+                                for (let x = 0; x < metadata.width; x++) {
+                                    for (let j = 0; j < Math.ceil(lineWidth); j++) {
+                                        try {
+                                            let y = yPos - (Math.ceil(lineWidth / 2)) + j;
+                                            const index = (y * metadata.width + x) * channels;
+                                            imageData.data[index] = r; // set red channel to r
+                                            imageData.data[index + 1] = g; // set green channel to g
+                                            imageData.data[index + 2] = b; // set blue channel to b
+                                        } catch (e) {
+
+                                        }
+
+                                    }
+                                }
+                            }
+
+                            await sharp(imageData.data, {
+                                raw: {
+                                    width: metadata.width,
+                                    height: metadata.height,
+                                    channels: channels
+                                }
+                            }).toFile('output.jpg');
+
+                            console.log('Vertical lines drawn successfully!');
+                        } catch (err) {
+                            console.error(err);
+                        }
+                    }
+
                     for (let i = 0; i < xCrops.ends.length; ++i) {
                         await new Promise((resolve, reject) => {
                             sharp(imgPath)
@@ -606,6 +676,22 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
                         // GET Y CROPS AND SAFE
                         let yCrops = getYCrops(backgroundColor, pixels);
                         await finishWithXCrops(verticalPaths, yCrops);
+
+
+                        const filePath = imgPath;
+                        let finalX = [];
+                        for (let i = 0; i < xCrops.ends.length; ++i) { // finalX = xCrops.ends didn't work properly on push !!
+                            finalX.push(xCrops.ends[i]);
+                        }
+                        //finalX = xCrops.ends;
+
+                        finalX[finalX.length - 1] = xCrops.rightEnd;
+                        finalX.push(xCrops.leftBegin);
+
+                        let finalY = yCrops.ends;
+                        finalY[finalY.length - 1] = yCrops.bottomEnd;
+                        finalY.push(yCrops.topBegin);
+                        drawLines(finalX.map(Math.ceil), finalY.map(Math.ceil), filePath, [50, 205, 50]);
                     }
                 }
             });
@@ -810,6 +896,7 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
         let firstStreakSpacing;
         let lastStreakSpacing;
         let streakYEnds = getResultingStreakYEnds();
+        columns = streakYEnds.length;
         let resStart = streaks[0][2] - firstStreakSpacing;
         let resEnd = streaks[streaks.length - 1][1] + lastStreakSpacing;
 
@@ -876,11 +963,9 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
             //console.log("count: " + count + " / " + pixels.length)
             //console.log(pixels.length * YFilledRequired)
             if (count > pixels.length * YFilledRequired) {
-                console.log("found pillar");
-
                 streak++;
             } else if (streak > 0) {
-                console.log("found pillar end");
+                //console.log("found column end");
                 streaks.push([streak, x + 1, currentStreakBegin]);
                 //console.log("got streak of " + streak + "");
                 //console.log("streak x end: " + (x + 1));
@@ -1493,7 +1578,7 @@ async function getLettersFromImages(dir, test) {
         }
 
     }
-} // letters should be black !
+} // letters should be black ! --> e.g invert ... using seperateLettersFromGrid() automates inverting and image preprocessing
 
 
 
