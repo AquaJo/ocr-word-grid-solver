@@ -1,3 +1,4 @@
+
 var Canvas = require('canvas');
 const sharp = require('sharp');
 
@@ -33,7 +34,7 @@ app.listen(3000, () => {
 
 
 
-//myAsyncLoad();
+
 async function getWordsFromGrid(strArr, rows, diagonals, minWordLength) {
 
     let germanWords = [];
@@ -367,17 +368,17 @@ async function getWordsFromGrid(strArr, rows, diagonals, minWordLength) {
                         }
                     }
                 }
-            }
 
-            // diagonale Wörter von rechts oben nach links unten
-            for (let i = 0; i < grid.length; i++) {
-                for (let j = grid[i].length - 1; j >= 0; j--) {
-                    for (let k = 0; i + k < grid.length && j - k >= 0; k++) {
-                        let word = '';
-                        for (let l = 0; l <= k; l++) {
-                            word += grid[i + l][j - l];
+                // diagonale Wörter von rechts oben nach links unten
+                for (let i = 0; i < grid.length; i++) {
+                    for (let j = grid[i].length - 1; j >= 0; j--) {
+                        for (let k = 0; i + k < grid.length && j - k >= 0; k++) {
+                            let word = '';
+                            for (let l = 0; l <= k; l++) {
+                                word += grid[i + l][j - l];
+                            }
+                            words.push(word);
                         }
-                        words.push(word);
                     }
                 }
             }
@@ -425,22 +426,88 @@ const { createWorker } = require('tesseract.js');
 var OCRAD = require('./ocrad.js');
 
 
-test();
-async function test() {
+start();
+async function start() {
     //await seperateLettersFromGrid("./puzzles/wordsearch3.png", "./letterSeperator", 1 / 20, 1 / 30, 90, 4 * 4, "none"); // second (number param) 1/6 before // instead 35 was 50
     let str = "hGyRCPyxlFLPdsRkgTYZ,AYoSXsVOdehUMQCPsFPx,JulThCrFnUNkfblOagbW,bmwKqLaZVcovTswIZKJw,qKGvbyjpyjvNSdWiUgIO,wVDyTANsJaewvTGPAJUa,svXIxGHUeHdmpPQfbGrA,IFlbtTSpNDgnZZvuEQIv,ntsGWNauWUmUomROMPUx,ZYnYahZeHqTsdMuAnQec,CXgcKMGUbayrwkeSigmV,NMdZqqgxCxtDcHolmUdB,QiElqgRGpoeLAlvUdViY,bKVZPcYrSjiVQxidtdbr,pitYQnuPKdpHSxrgDQiu,TAVtaGnEHfAUIoaITQJR";
     //str = "GCPHUFNEVAWJUAOND,RGNDTVEKUHDEARUYT,DEUONNJZEVLGEWHGT,IDMBLNEAABZLEULJT,VNERNYTIAEITKVEQR,PIPHOLPCCOGVDYDJA,EWQEOFYNBITAUHCFN,ECNSAVSUCWFNTKNJS,PNSWZPRNJSUFRLYOM,WZITVPIAACFDENOSI,TRCBYTYQLRQCGSUVS,OMUURMMEQOTALCFNS,TJRMRUAKELSAAOZXI,KBRUWRTWEIOLIOZOO,BEEMFHQQXCFZUUCON,EJNECNATSISERZRXY,COTLGSDZYDONLOUVR";
-    let rows = await seperateLettersFromGrid("./puzzles/wordsearch5.PNG", "./letterSeperator", 1 / 15, 1 / 24, 130, 0.0228, "none")//,3300); // second (number param) 1/6 before // instead 35 was 50 , ....  4*8 maybe into percent of image ... (width and height)
+    let seperateLettersFromGridObj = await seperateLettersFromGrid("./puzzles/hard.PNG", "./letterSeperator", "./communicator", 1 / 15, 1 / 24, 130, 0.0228, "none", null,)//,3300); // second (number param) 1/6 before // instead 35 was 50 , ....  4*8 maybe into percent of image ... (width and height)
+    let rows = seperateLettersFromGridObj.rows;
+    let xCrops = seperateLettersFromGridObj.xCrops;
+    let yCrops = seperateLettersFromGridObj.yCrops;
+
     let strArr = await getLettersFromImages("./letterSeperator/tempFinals", str); // images with one letter only
+    await markCellsWithXandYCrops('./communicator/visualizedCropping.png', './communicator/wordVisualizations.png', xCrops, yCrops, [{ cells: [[0, 3], [4, 2], [8, 7], [12, 8]], color: "red" }, { cells: [[1, 3], [5, 2], [9, 7], [10, 7]], color: "blue" }]); // for testing as of now only // prototype
+
     getWordsFromGrid(strArr, rows, true, 3);
     //console.log(strArr);
-
 }
 
-async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff, filter, xUpscale) {
+async function markCellsWithXandYCrops(inputPath, outputPath, xCrops, yCrops, cells) {
+    console.group("cell-marker");
+    await new Promise(resolve => {
+        let resXCrops = [];
+        for (let i = 0; i < xCrops.ends.length; ++i) {
+            resXCrops.push({ left: i !== 0 ? Math.ceil(xCrops.ends[i - 1]) : Math.ceil(xCrops.leftBegin), width: i !== 0 ? (i !== xCrops.ends.length - 1 ? Math.ceil(xCrops.ends[i] - xCrops.ends[i - 1]) : Math.ceil(xCrops.rightEnd - xCrops.ends[i - 1])) : Math.ceil(xCrops.ends[0] - xCrops.leftBegin) });
+        }
+        let resYCrops = [];
+        for (let i = 0; i < yCrops.ends.length; ++i) {
+            resYCrops.push({ top: i !== 0 ? Math.ceil(yCrops.ends[i - 1]) : Math.ceil(yCrops.topBegin), height: i !== 0 ? (i !== yCrops.ends.length - 1 ? Math.ceil(yCrops.ends[i] - yCrops.ends[i - 1]) : Math.ceil(yCrops.bottomEnd - yCrops.ends[i - 1])) : Math.ceil(yCrops.ends[0] - yCrops.topBegin) })
+        }
+        markCells(inputPath, outputPath, cells);
+        function markCells(inputPath, outputPath, cells) {
+            let coords = [];
+            for (let i = 0; i < cells.length; ++i) {
+                for (let j = 0; j < cells[i].cells.length; ++j) {
+                    let row = cells[i].cells[j][0];
+                    let col = cells[i].cells[j][1];
+                    let left = resXCrops[row].left;
+                    let top = resYCrops[col].top;
+                    let width = resXCrops[row].width;
+                    let height = resYCrops[col].height;
+                    coords.push({ left: left, top: top, width: width, height: height, color: cells[i].color });
+                }
+            }
+            markAt(inputPath, outputPath, coords);
+        }
+        //markAt(inputPath, outputPath, coordinates, 'red');
+        async function markAt(inputPath, outputPath, coordinates) {
+            let resArr = [];
+            for (let i = 0; i < coordinates.length; i++) {
+                let left = coordinates[i].left;
+                let top = coordinates[i].top;
+                let width = coordinates[i].width;
+                let height = coordinates[i].height;
+
+                const tintedArea = await sharp(inputPath)
+                    .extract({ left, top, width, height })
+                    .tint(coordinates[i].color)
+                    .toBuffer();
+                resArr.push({ input: tintedArea, left: left, top: top });
+            }
+            sharp(inputPath)
+                .composite(resArr)
+                .toFile(outputPath, (err, info) => {
+                    if (err) throw err;
+                    console.log("successfully marked cells")
+                    console.groupEnd();
+                    resolve();
+                });
+        }
+    });
+}
+
+async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilledRequired, YFilledRequired, minBackgroundDiff, streakMaxDiff, filter, xUpscale) {
     let backgroundColor;
     let imgPath = grid;
+
+
+    // RETURNS
     let rows;
+    let xCrops;
+    let yCrops;
+
+
     let columns;
     // create output dir and needed folders
     createFoldersIfNeeded(outputDir + "/tempVerticals"); // works because recursive
@@ -452,7 +519,7 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
     }
 
     console.group("image analysing");
-    if (filter !== "none") {
+    if (filter !== "none" && filter !== null && filter) {
         console.log("using ridge detection filter");
         await useFilter(imgPath, outputDir + "/filteredImage.png", filter); // png
         console.log("filtering done, starting splitting");
@@ -544,7 +611,7 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
                     });
                 }
                 // GET X CROPS AND SAFE
-                let xCrops = getXCrops(backgroundColor, pixels);
+                xCrops = getXCrops(backgroundColor, pixels);
                 // deleting temp folder before
                 let directory = outputDir + "/tempVerticals/";
                 fs.readdir(directory, (err, files) => {
@@ -579,10 +646,8 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
                     let verticalPaths = [];
 
 
-                    async function drawLines(xPositions, yPositions, filePath, color = [255, 255, 0]) {
+                    async function drawLines(outputDir, xPositions, yPositions, filePath, color = [255, 255, 0]) {
                         try {
-
-
 
                             const image = sharp(filePath);
                             const metadata = await image.metadata();
@@ -631,19 +696,23 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
                                     }
                                 }
                             }
-
+                            createFoldersIfNeeded(outputDir);
+                            // write image
                             await sharp(imageData.data, {
                                 raw: {
                                     width: metadata.width,
                                     height: metadata.height,
                                     channels: channels
                                 }
-                            }).toFile('output.jpg');
+                            }).toFile(outputDir + './visualizedCropping.png');
 
-                            console.log('Vertical lines drawn successfully!');
+                            console.log('Vertical lines drawn successfully! - cropping visualized and saved in communicator folder');
                         } catch (err) {
                             console.error(err);
                         }
+
+
+
                     }
 
                     for (let i = 0; i < xCrops.ends.length; ++i) {
@@ -661,6 +730,7 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
                                             // main finish in finish() function
                                             await finish();
                                             console.groupEnd();
+
                                             resolve();
                                         } else {
                                             resolve();
@@ -674,7 +744,7 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
 
                     async function finish() {
                         // GET Y CROPS AND SAFE
-                        let yCrops = getYCrops(backgroundColor, pixels);
+                        yCrops = getYCrops(backgroundColor, pixels);
                         await finishWithXCrops(verticalPaths, yCrops);
 
 
@@ -691,12 +761,12 @@ async function seperateLettersFromGrid(grid, outputDir, XFilledRequired, YFilled
                         let finalY = yCrops.ends;
                         finalY[finalY.length - 1] = yCrops.bottomEnd;
                         finalY.push(yCrops.topBegin);
-                        drawLines(finalX.map(Math.ceil), finalY.map(Math.ceil), filePath, [50, 205, 50]);
+                        await drawLines(communicatorDir, finalX.map(Math.ceil), finalY.map(Math.ceil), filePath, [50, 205, 50]);
                     }
                 }
             });
     });
-    return rows;
+    return { rows, xCrops, yCrops };
     function isColorCloserToWhiteOrBlack(rgbColor) {
         const red = rgbColor[0];
         const green = rgbColor[1];
