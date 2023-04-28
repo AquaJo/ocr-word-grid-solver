@@ -3,14 +3,64 @@ var Canvas = require('canvas');
 const sharp = require('sharp');
 
 const fetch = require('node-fetch');
-const express = require('express');
-const app = express();
+
+const { createWorker } = require('tesseract.js');
+var OCRAD = require('./ocrad.js');
+
+
 const fs = require('fs');
 const path = require("path");
 
+const readline = require('readline').createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+function prompt(question) {
+    return new Promise(resolve => {
+        readline.question(question, answer => {
+            resolve(answer);
+        });
+    });
+}
+start();
+
+async function start() {
+
+    const autoAnalyze = await prompt('Do you want the puzzle to be analyzed automatically? (y/n) ');
+    if (autoAnalyze.toLowerCase() === "y") {
+        const imagePath = await prompt('Name the relative path to the grid puzzle image (to the projects folder): ');
+
+        let seperateLettersFromGridObj = await seperateLettersFromGrid(imagePath, "./letterSeperator", "./communicator", 1 / 15, 1 / 24, 130, 0.0228, "none", null,)//,3300); // second (number param) 1/6 before // instead 35 was 50 , ....  4*8 maybe into percent of image ... (width and height)
+        let rows = seperateLettersFromGridObj.rows;
+        let xCrops = seperateLettersFromGridObj.xCrops;
+        let yCrops = seperateLettersFromGridObj.yCrops;
+
+        let strArr = await getLettersFromImages("./letterSeperator/tempFinals"); // images with one letter only
 
 
+        const markWords = await prompt('Do you want to mark words in the grid now? (y/n), type n (now or after y) when you want to continue: ');
+        if (markWords.toLowerCase() === "y") {
+            let words = await prompt('Name the words you want to mark in the grid seperated by a comma (,): ');
+            while (words.toLowerCase() !== "n") {
+                words = words.replace(/\s/g, "");
+                words = words.split(",");
+                await markWordsInGrid(strArr, rows, words, xCrops, yCrops);
+                words = await prompt('Name the words you want to mark in the grid seperated by a comma (,): ');
+            }
+        }
+        const searchWords = await prompt('Do you want to search for words in the grid now? (y/n): ');
+        if (searchWords.toLowerCase() === "y") {
+            getWordsFromGrid(strArr, rows, true, 3);
+        }
+    }
+    //getWordsFromGrid(strArr, rows, true, 3);
 
+    //console.log(strArr);*/
+}
+
+
+/*
 let baseUrl = "http://localhost:3000";
 // statische Dateien bereitstellen
 app.use(express.static('public'));
@@ -28,10 +78,11 @@ app.get('/api/example', (req, res) => {
 
 // Server starten
 app.listen(3000, () => {
-    console.log('Server gestartet auf http://localhost:3000');
+    console.log('Server running on http://localhost:3000');
+    
 });
 
-
+*/
 
 
 
@@ -47,13 +98,14 @@ async function getWordsFromGrid(strArr, rows, diagonals, minWordLength) {
         } else {
             // Andernfalls lade die Textdatei und speichere sie im Cache
             //const url = "https://raw.githubusercontent.com/enz/german-wordlist/master/words";
-            const url = baseUrl + "/wordlists/german/german.txt";
-            return fetch(url)
-                .then(response => response.text())
-                .then(text => {
-                    germanWords = text.split(/\r?\n/);
-                    return germanWords.map((str) => str.toLowerCase());
-                });
+            //const url = baseUrl + "/wordlists/german/german.txt";
+            //return fetch(url)
+            //  .then(response => response.text())
+            //.then(text => {
+            let text = fs.readFileSync("./languageResources/wordlists/german/german.txt", 'utf-8')
+            germanWords = text.split(/\r?\n/);
+            return germanWords.map((str) => str.toLowerCase());
+            //        });
         }
     }
 
@@ -64,13 +116,15 @@ async function getWordsFromGrid(strArr, rows, diagonals, minWordLength) {
         } else {
             // Andernfalls lade die JSON-Datei und speichere sie im Cache
             //const url = "https://raw.githubusercontent.com/dwyl/english-words/master/words_dictionary.json";
-            const url = baseUrl + "/wordlists/english/english.json";
-            return fetch(url)
+            //const url = baseUrl + "/wordlists/english/english.json";
+            /*return fetch(url)
                 .then(response => response.json())
-                .then(json => {
-                    englishWords = Object.keys(json);
-                    return englishWords.map((str) => str.toLowerCase());
-                });
+                .then(json => {*/
+            let text = fs.readFileSync("./languageResources/wordlists/english/english.json", 'utf-8')
+            let json = JSON.parse(text);
+            englishWords = Object.keys(json);
+            return englishWords.map((str) => str.toLowerCase());
+            //  });
         }
     }
 
@@ -102,20 +156,13 @@ async function getWordsFromGrid(strArr, rows, diagonals, minWordLength) {
             ['u', 'v', 'w', 'x', 'y']
         ];
     */
-    function splitArray(array, rowLength) {
-        const result = [];
-        for (let i = 0; i < array.length; i += rowLength) {
-            const row = array.slice(i, i + rowLength);
-            result.push(row);
-        }
-        return result;
-    }
+
 
     grid = splitArray(strArr, rows);
     console.log(grid);
 
 
-    let allPossibilities = getAllPossibilities(grid);
+    let allPossibilities = getAllPossibilities(grid, diagonals).map(obj => obj.word);
 
 
     console.log("all possibilities: " + allPossibilities.length + " items");
@@ -273,7 +320,7 @@ async function getWordsFromGrid(strArr, rows, diagonals, minWordLength) {
         }
 
         // Example usage
-        const filePaths = ['./public/dictionaries/EnglishToGerman.json', './public/dictionaries/GermanToEnglish.json'];
+        const filePaths = ['./languageResources/dictionaries/EnglishToGerman.json', './languageResources/dictionaries/GermanToEnglish.json'];
         let common = [];
         let uncommon = [];
         for (let i = 0; i < arr.length; ++i) {
@@ -316,133 +363,165 @@ async function getWordsFromGrid(strArr, rows, diagonals, minWordLength) {
         return joinArray; // "olleh"
     }
 
-    function getAllPossibilities(grid) {
-        function reverseEachListItem(arr) {
-            let res = [];
-            for (let i = 0; i < arr.length; ++i) {
-                res.push(reverseString(arr[i]));
-            }
-            return res;
-        }
-
-        function forwardWords() {
-            let words = [];
-
-            // horizontale Wörter
-            for (let i = 0; i < grid.length; i++) {
-                let word = '';
-                for (let j = 0; j < grid[i].length; j++) {
-                    // jedes mögliche Wort am aktuellen Ort ermitteln
-                    for (let k = j; k < grid[i].length; k++) {
-                        word += grid[i][k];
-                        words.push(word);
-                    }
-                    word = '';
-                }
-            }
-
-            // vertikale Wörter
-            for (let i = 0; i < grid[0].length; i++) {
-                let word = '';
-                for (let j = 0; j < grid.length; j++) {
-                    // jedes mögliche Wort am aktuellen Ort ermitteln
-                    for (let k = j; k < grid.length; k++) {
-                        word += grid[k][i];
-                        words.push(word);
-                    }
-                    word = '';
-                }
-            }
 
 
-            // diagonale Wörter von links oben nach rechts unten
-            if (diagonals) {
-                for (let i = 0; i < grid.length; i++) {
-                    for (let j = 0; j < grid[i].length; j++) {
-                        for (let k = 0; i + k < grid.length && j + k < grid[i].length; k++) {
-                            let word = '';
-                            for (let l = 0; l <= k; l++) {
-                                word += grid[i + l][j + l];
-                            }
-                            words.push(word);
-                        }
-                    }
-                }
+}
+function splitArray(array, rowLength) {
+    const result = [];
+    for (let i = 0; i < array.length; i += rowLength) {
+        const row = array.slice(i, i + rowLength);
+        result.push(row);
+    }
+    return result;
+}
 
-                // diagonale Wörter von rechts oben nach links unten
-                for (let i = 0; i < grid.length; i++) {
-                    for (let j = grid[i].length - 1; j >= 0; j--) {
-                        for (let k = 0; i + k < grid.length && j - k >= 0; k++) {
-                            let word = '';
-                            for (let l = 0; l <= k; l++) {
-                                word += grid[i + l][j - l];
-                            }
-                            words.push(word);
-                        }
-                    }
-                }
-            }
-
-            return words;
-        }
-
-        let wordsForward = forwardWords();
-        let wordsBackward = reverseEachListItem(wordsForward);
-        let res = wordsForward.concat(wordsBackward);
-        return res;
+function getAllPossibilities(grid, diagonals) { // very shitty, especially how cells are handled (!!)
+    function reverseEachListItem(arr) {
+        const newArray = arr.map(obj => {
+            const reversedWord = obj.word.split('').reverse().join('');
+            return { word: reversedWord, cells: obj.cells };
+        });
+        return newArray;
     }
 
+    function forwardWords() {
+        let words = [];
+        let cells = [];
+        // horizontale Wörter
+        for (let i = 0; i < grid.length; i++) {
+            let word = '';
+            for (let j = 0; j < grid[i].length; j++) { // j is the beginning cell (column wise)
+                // jedes mögliche Wort am aktuellen Ort ermitteln
+                for (let k = j; k < grid[i].length; k++) {
+                    word += grid[i][k];
+                    cells.push([k, i]); // [row, column]
+                    words.push({ word: word, cells: cells.slice(0, word.length) });
+                }
+                word = '';
+                cells = [];
+            }
+        }
+
+        // vertikale Wörter
+        for (let i = 0; i < grid[0].length; i++) {
+            let word = '';
+            for (let j = 0; j < grid.length; j++) {
+                // jedes mögliche Wort am aktuellen Ort ermitteln
+                for (let k = j; k < grid.length; k++) {
+                    word += grid[k][i];
+                    cells.push([i, k]); // [row, column]
+                    words.push({ word: word, cells: cells.slice(0, word.length) });
+                }
+                word = '';
+                cells = [];
+            }
+        }
 
 
+        // diagonale Wörter von links oben nach rechts unten
+        if (diagonals) {
+            for (let i = 0; i < grid.length; i++) {
+
+                for (let j = 0; j < grid[i].length; j++) {
+                    for (let k = 0; i + k < grid.length && j + k < grid[i].length; k++) {
+                        let word = '';
+                        for (let l = 0; l <= k; l++) {
+                            word += grid[i + l][j + l];
+                            cells.push([j + l, i + l]); // [row, column]
+                        }
+                        words.push({ word: word, cells: cells });
+                        cells = [];
+                    }
+                }
+            }
+
+            // diagonale Wörter von rechts oben nach links unten
+            for (let i = 0; i < grid.length; i++) {
+                for (let j = grid[i].length - 1; j >= 0; j--) {
+                    for (let k = 0; i + k < grid.length && j - k >= 0; k++) {
+                        let word = '';
+                        for (let l = 0; l <= k; l++) {
+                            word += grid[i + l][j - l];
+                            cells.push([j - l, i + l]); // [row, column]
+                        }
+                        words.push({ word: word, cells: cells });
+                        cells = [];
+                    }
+                }
+            }
+        }
+
+        return words;
+    }
+
+    let wordsForward = forwardWords();
+    let wordsBackward = reverseEachListItem(wordsForward);
+    let res = wordsForward.concat(wordsBackward);
+
+    return res;
 }
 
 
 
 
 
+async function markWordsInGrid(strArr, rows, keyWords, xCrops, yCrops) {
+    console.group("word-marker");
+    let grid = splitArray(strArr, rows);
+    let possibilities = getAllPossibilities(grid, true);
+    let cellsCollection = [];
 
 
+    let lastColorI = -1;
+    let lastColor;;
+    for (let i = 0; i < keyWords.length; ++i) {
+        let indexArr = possibilities.filter(obj => obj.word.toLowerCase() === keyWords[i].toLowerCase()).map(obj => possibilities.indexOf(obj));
+
+        for (let j = 0; j < indexArr.length; ++j) {
+            index = indexArr[j];
+            if (index !== -1) {
+                let obj = {};
+                obj.cells = possibilities[index].cells;
+                //console.log(obj.cells)
+                function generateColor() {
+                    let color = {};
+                    let r, g, b;
+
+                    do {
+                        r = Math.floor(Math.random() * 256);
+                        g = Math.floor(Math.random() * 256);
+                        b = Math.floor(Math.random() * 256);
+                    } while (Math.abs(r - g) < 30 || Math.abs(r - b) < 30 || Math.abs(g - b) < 30); // for contrast to white background
+
+                    color.r = r;
+                    color.g = g;
+                    color.b = b;
+
+                    return color;
+                }
 
 
+                if (i === lastColorI) {
+                    obj.color = lastColor;
+                } else {
+                    obj.color = generateColor();
+                    lastColor = obj.color;
+                }
+                lastColorI = i;
+                console.log("found word: " + keyWords[i] + " in grid, marking it with color: " + JSON.stringify(obj.color));
+                cellsCollection.push(obj);
+            } else {
+                console.log("could not find word: " + keyWords[i] + " in grid");
+            }
+        }
 
-
-
-
-
-
-
-
-
-
-
-
-
-//const Tesseract = require('tesseract.js'); // Tesseract requires internet connection (first time)
-
-const { createWorker } = require('tesseract.js');
-
-
-
-var OCRAD = require('./ocrad.js');
-
-
-start();
-async function start() {
-    //await seperateLettersFromGrid("./puzzles/wordsearch3.png", "./letterSeperator", 1 / 20, 1 / 30, 90, 4 * 4, "none"); // second (number param) 1/6 before // instead 35 was 50
-    let str = "hGyRCPyxlFLPdsRkgTYZ,AYoSXsVOdehUMQCPsFPx,JulThCrFnUNkfblOagbW,bmwKqLaZVcovTswIZKJw,qKGvbyjpyjvNSdWiUgIO,wVDyTANsJaewvTGPAJUa,svXIxGHUeHdmpPQfbGrA,IFlbtTSpNDgnZZvuEQIv,ntsGWNauWUmUomROMPUx,ZYnYahZeHqTsdMuAnQec,CXgcKMGUbayrwkeSigmV,NMdZqqgxCxtDcHolmUdB,QiElqgRGpoeLAlvUdViY,bKVZPcYrSjiVQxidtdbr,pitYQnuPKdpHSxrgDQiu,TAVtaGnEHfAUIoaITQJR";
-    //str = "GCPHUFNEVAWJUAOND,RGNDTVEKUHDEARUYT,DEUONNJZEVLGEWHGT,IDMBLNEAABZLEULJT,VNERNYTIAEITKVEQR,PIPHOLPCCOGVDYDJA,EWQEOFYNBITAUHCFN,ECNSAVSUCWFNTKNJS,PNSWZPRNJSUFRLYOM,WZITVPIAACFDENOSI,TRCBYTYQLRQCGSUVS,OMUURMMEQOTALCFNS,TJRMRUAKELSAAOZXI,KBRUWRTWEIOLIOZOO,BEEMFHQQXCFZUUCON,EJNECNATSISERZRXY,COTLGSDZYDONLOUVR";
-    let seperateLettersFromGridObj = await seperateLettersFromGrid("./puzzles/hard.PNG", "./letterSeperator", "./communicator", 1 / 15, 1 / 24, 130, 0.0228, "none", null,)//,3300); // second (number param) 1/6 before // instead 35 was 50 , ....  4*8 maybe into percent of image ... (width and height)
-    let rows = seperateLettersFromGridObj.rows;
-    let xCrops = seperateLettersFromGridObj.xCrops;
-    let yCrops = seperateLettersFromGridObj.yCrops;
-
-    let strArr = await getLettersFromImages("./letterSeperator/tempFinals", str); // images with one letter only
-    await markCellsWithXandYCrops('./communicator/visualizedCropping.png', './communicator/wordVisualizations.png', xCrops, yCrops, [{ cells: [[0, 3], [4, 2], [8, 7], [12, 8]], color: "red" }, { cells: [[1, 3], [5, 2], [9, 7], [10, 7]], color: "blue" }]); // for testing as of now only // prototype
-
-    getWordsFromGrid(strArr, rows, true, 3);
-    //console.log(strArr);
+    }
+    console.log("now marking cells");
+    if (cellsCollection.length > 0) { // ()
+        await markCellsWithXandYCrops("./communicator/visualizedCropping.png", "./communicator/wordVisualizations.png", xCrops, yCrops, cellsCollection);
+    }
+    console.groupEnd();
 }
-
 async function markCellsWithXandYCrops(inputPath, outputPath, xCrops, yCrops, cells) {
     console.group("cell-marker");
     await new Promise(resolve => {
