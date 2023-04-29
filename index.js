@@ -11,14 +11,14 @@ var OCRAD = require('./ocrad.js');
 const fs = require('fs');
 const path = require("path");
 
-const readline = require('readline').createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
 
 startPrompting();
 
 async function startPrompting() {
+    const readline = require('readline').createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
     function prompt(question) {
         return new Promise(resolve => {
             readline.question(question, answer => {
