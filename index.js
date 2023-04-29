@@ -230,7 +230,7 @@ async function getWordsFromGrid(strArr, rows, diagonals, minWordLength) {
     // sort found words by commonality
     let sort = sortArrByCommonality(foundWords);
     console.log("final array sort by commonality with the help of a shorter dictionary (some common words might still be missed in ranking by commonality): ");
-    console.dir(sort, { 'maxArrayLength': 999 });
+    console.dir(sort, { 'maxArrayLength': 30000 });
     console.groupEnd()
     return sort; // !
 
@@ -622,8 +622,7 @@ async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilled
     let xCrops;
     let yCrops;
 
-
-    let columns;
+    let seperatingLinesFound = false;
     // create output dir and needed folders
     createFoldersIfNeeded(outputDir + "/tempVerticals"); // works because recursive
     createFoldersIfNeeded(outputDir + "/tempFinals");
@@ -860,7 +859,11 @@ async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilled
                     async function finish() {
                         // GET Y CROPS AND SAFE
                         yCrops = getYCrops(backgroundColor, pixels);
-                        await finishWithXCrops(verticalPaths, yCrops);
+
+                        if (seperatingLinesFound) {
+                            console.log("because of possible seperation lines, finals cropping will be zoomed in a bit");
+                        }
+                        await finishWithXCrops(verticalPaths, yCrops, seperatingLinesFound);
 
 
                         const filePath = imgPath;
@@ -900,7 +903,7 @@ async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilled
 
 
 
-    async function finishWithXCrops(paths, yCrops) {
+    async function finishWithXCrops(paths, yCrops, moreLimitedImage) {
         let allPathsLength = paths.length;
         for (let i = 0; i < paths.length; ++i) {
             let myPath = paths[i];
@@ -934,19 +937,44 @@ async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilled
                         let myPartNum = Number(splitPath[splitPath.length - 1].split(".")[0]);
 
 
+                        //let moreLimitedImage = true; // in case of seperation lines, to have them outside the picture
+                        
                         for (let i = 0; i < yCrops.ends.length; ++i) {
                             let toFile = outputDir + '/tempFinals/' + ((i) * allPathsLength + (myPartNum + 1)) + '.png'; // calculate number in query ...
                             await new Promise((resolve, reject) => {
-                                sharp(myPath)
-                                    .extract({ left: 0, top: i !== 0 ? Math.ceil(yCrops.ends[i - 1]) : Math.ceil(yCrops.topBegin), width: info.width, height: i !== 0 ? (i !== yCrops.ends.length - 1 ? Math.ceil(yCrops.ends[i] - yCrops.ends[i - 1]) : Math.ceil(yCrops.bottomEnd - yCrops.ends[i - 1])) : Math.ceil(yCrops.ends[0] - yCrops.topBegin) })
-                                    .toFile(toFile, (err, info) => {
-                                        if (err) {
-                                            console.log(err);
-                                        } else {
-                                            //  console.log("added as final image part: " + toFile);
-                                        }
-                                        resolve();
-                                    });
+                                if (moreLimitedImage) {
+                                    sharp(myPath)
+                                        .metadata()
+                                        .then((metadata) => {
+                                            // Calculate the crop area
+                                            const width = metadata.width;
+
+
+                                            let factor = 0.05;
+                                            let move = Math.ceil(width * factor);
+                                            sharp(myPath)
+                                                .extract({ left: move, top: (i !== 0 ? Math.ceil(yCrops.ends[i - 1]) : Math.ceil(yCrops.topBegin)) + move, width: info.width - move * 2, height: (i !== 0 ? (i !== yCrops.ends.length - 1 ? Math.ceil(yCrops.ends[i] - yCrops.ends[i - 1]) : Math.ceil(yCrops.bottomEnd - yCrops.ends[i - 1])) : Math.ceil(yCrops.ends[0] - yCrops.topBegin)) - move * 2 })
+                                                .toFile(toFile, (err, info) => {
+                                                    if (err) {
+                                                        console.log(err);
+                                                    } else {
+                                                        //  console.log("added as final image part: " + toFile);
+                                                    }
+                                                    resolve();
+                                                });
+                                        });
+                                } else {
+                                    sharp(myPath)
+                                        .extract({ left: 0, top: i !== 0 ? Math.ceil(yCrops.ends[i - 1]) : Math.ceil(yCrops.topBegin), width: info.width, height: i !== 0 ? (i !== yCrops.ends.length - 1 ? Math.ceil(yCrops.ends[i] - yCrops.ends[i - 1]) : Math.ceil(yCrops.bottomEnd - yCrops.ends[i - 1])) : Math.ceil(yCrops.ends[0] - yCrops.topBegin) })
+                                        .toFile(toFile, (err, info) => {
+                                            if (err) {
+                                                console.log(err);
+                                            } else {
+                                                //  console.log("added as final image part: " + toFile);
+                                            }
+                                            resolve();
+                                        });
+                                }
                             });
                         }
                         resolve();
@@ -1102,6 +1130,14 @@ async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilled
                     finalStreaks.push(streaks[i]);
                 }
             }
+
+            // speculate wheter or not there are seperating lines (horizontally)
+            if (streaks.length > finalStreaks.length * 1.5) {
+                seperatingLinesFound = true;
+            }
+            //
+
+
             console.log("found " + finalStreaks.length + " streaks after similarity streak check");
             for (let i = 0; i < finalStreaks.length; ++i) {
                 if (i !== finalStreaks.length - 1) {
@@ -1191,6 +1227,13 @@ async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilled
                     finalStreaks.push(streaks[i]);
                 }
             }
+
+            // speculate wheter or not there are seperating lines (horizontally)
+            if (streaks.length > finalStreaks.length * 1.5) {
+                seperatingLinesFound = true;
+            }
+            //
+
             console.log("found " + finalStreaks.length + " streaks after similarity streak check");
             for (let i = 0; i < finalStreaks.length; ++i) {
                 if (i !== finalStreaks.length - 1) {
