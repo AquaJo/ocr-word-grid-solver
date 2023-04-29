@@ -513,7 +513,7 @@ async function markWordsInGrid(strArr, rows, keyWords, xCrops, yCrops) {
     for (let i = 0; i < keyWords.length; ++i) {
         let indexArr = possibilities.filter(obj => obj.word.toLowerCase() === keyWords[i].toLowerCase()).map(obj => possibilities.indexOf(obj));
 
-        for (let j = 0; j < indexArr.length; ++j) {
+        for (let j = 0; j < indexArr.length; ++j) { // if one letter, found multiples times as the same cell
             index = indexArr[j];
             if (index !== -1) {
                 let obj = {};
@@ -527,7 +527,7 @@ async function markWordsInGrid(strArr, rows, keyWords, xCrops, yCrops) {
                         r = Math.floor(Math.random() * 256);
                         g = Math.floor(Math.random() * 256);
                         b = Math.floor(Math.random() * 256);
-                    } while (Math.abs(r - g) < 30 || Math.abs(r - b) < 30 || Math.abs(g - b) < 30); // for contrast to white background
+                    } while (Math.abs(r - g) < 50 || Math.abs(r - b) < 50 || Math.abs(g - b) < 50); // for contrast to white background
 
                     color.r = r;
                     color.g = g;
