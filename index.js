@@ -27,8 +27,6 @@ async function startPrompting() {
         });
     }
 
-    let searchWords1;
-
     let autoAnalyze = (await prompt('Do you want the puzzle to be analyzed automatically? (y/n) (else no option to visualize or locate): ')).toLowerCase();
     while (autoAnalyze !== "n" && autoAnalyze !== "y") {
         autoAnalyze = (await prompt('Do you want the puzzle to be analyzed automatically? (y/n): ')).toLowerCase();;
@@ -52,15 +50,15 @@ async function startPrompting() {
             await markering();
         }
 
-        searchWords1 = (await prompt('Do you want to search for words in the grid now? (y/n): ')).toLowerCase();
-        while (searchWords1 !== "n" && searchWords1 !== "y") {
-            searchWords1 = (await prompt('Do you want to search for words in the grid now? (y/n): ')).toLowerCase();
+        let searchWords = (await prompt('Do you want to search for words in the grid now? (y/n): ')).toLowerCase();
+        while (searchWords !== "n" && searchWords !== "y") {
+            searchWords = (await prompt('Do you want to search for words in the grid now? (y/n): ')).toLowerCase();
         }
-        if (searchWords1 === "y") {
-            getWordsFromGrid(strArr, rows, true, 3); // min words automatically set to 3
+        if (searchWords === "y") {
+            await getWordsFromGrid(strArr, rowsLength, true, 3); // min words automatically set to 3
         }
 
-        if (searchWords1 !== "n") {
+        if (searchWords !== "n") {
             let markWordsFinal = (await prompt("Do you want to mark words in the grid now? (y/n) (finish now or after 'y' by entering 'n'): ")).toLowerCase();
             while (markWordsFinal !== "n" && markWordsFinal !== "y") {
                 markWordsFinal = (await prompt("Do you want to mark words in the grid now? (y/n) (finish now or after 'y' by entering 'n'): ")).toLowerCase();
@@ -119,36 +117,8 @@ async function startPrompting() {
             getWordsFromGrid(strArr, rowsLength, true, 3); // min words automatically set to 3
         }
     }
-
-    //getWordsFromGrid(strArr, rows, true, 3);
-
-    //console.log(strArr);*/
 }
 
-
-/*
-let baseUrl = "http://localhost:3000";
-// statische Dateien bereitstellen
-app.use(express.static('public'));
-
-// HTTP-Handler für die Startseite
-app.get('/', (req, res) => {
-    res.send('Willkommen auf der Startseite!');
-});
-
-// HTTP-Handler für einen API-Endpunkt
-app.get('/api/example', (req, res) => {
-    const data = { message: 'Dies ist eine Beispielantwort.' };
-    res.json(data);
-});
-
-// Server starten
-app.listen(3000, () => {
-    console.log('Server running on http://localhost:3000');
-    
-});
-
-*/
 
 
 
@@ -203,7 +173,7 @@ async function getWordsFromGrid(strArr, rows, diagonals, minWordLength) {
     // MAIN
     console.group("start - information");
     console.log(`number of german words in wordlist: ${germanWords.length}`);
-    console.log(`number of englisch words in wordlist: ${englishWords.length}`);
+    console.log(`number of english words in wordlist: ${englishWords.length}`);
 
     let engTest = "apple";
     let deTest = "apfel";
