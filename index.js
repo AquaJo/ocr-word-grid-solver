@@ -16,44 +16,110 @@ const readline = require('readline').createInterface({
     output: process.stdout
 });
 
-function prompt(question) {
-    return new Promise(resolve => {
-        readline.question(question, answer => {
-            resolve(answer);
+startPrompting();
+
+async function startPrompting() {
+    function prompt(question) {
+        return new Promise(resolve => {
+            readline.question(question, answer => {
+                resolve(answer);
+            });
         });
-    });
-}
-start();
+    }
 
-async function start() {
+    let searchWords1;
 
-    const autoAnalyze = await prompt('Do you want the puzzle to be analyzed automatically? (y/n) ');
+    let autoAnalyze = (await prompt('Do you want the puzzle to be analyzed automatically? (y/n) (else no option to visualize or locate): ')).toLowerCase();
+    while (autoAnalyze !== "n" && autoAnalyze !== "y") {
+        autoAnalyze = (await prompt('Do you want the puzzle to be analyzed automatically? (y/n): ')).toLowerCase();;
+    }
+
     if (autoAnalyze.toLowerCase() === "y") {
-        const imagePath = await prompt('Name the relative path to the grid puzzle image (to the projects folder): ');
+        let imagePath = await prompt('Name the relative path to the grid puzzle image (to the projects folder): ');
 
         let seperateLettersFromGridObj = await seperateLettersFromGrid(imagePath, "./letterSeperator", "./communicator", 1 / 15, 1 / 24, 130, 0.0228, "none", null,)//,3300); // second (number param) 1/6 before // instead 35 was 50 , ....  4*8 maybe into percent of image ... (width and height)
-        let rows = seperateLettersFromGridObj.rows;
+        let rowsLength = seperateLettersFromGridObj.rowsLength;
         let xCrops = seperateLettersFromGridObj.xCrops;
         let yCrops = seperateLettersFromGridObj.yCrops;
 
         let strArr = await getLettersFromImages("./letterSeperator/tempFinals"); // images with one letter only
 
+        let markWords = (await prompt('Do you want to mark words in the grid now? (y/n), type n (now or after y) when you want to continue: ')).toLowerCase();
+        while (markWords !== "n" && markWords !== "y") {
+            markWords = (await prompt('Do you want to mark words in the grid now? (y/n), type n (now or after y) when you want to continue: ')).toLowerCase();
+        }
+        if (markWords === "y") {
+            await markering();
+        }
 
-        const markWords = await prompt('Do you want to mark words in the grid now? (y/n), type n (now or after y) when you want to continue: ');
-        if (markWords.toLowerCase() === "y") {
-            let words = await prompt('Name the words you want to mark in the grid seperated by a comma (,): ');
-            while (words.toLowerCase() !== "n") {
+        searchWords1 = (await prompt('Do you want to search for words in the grid now? (y/n): ')).toLowerCase();
+        while (searchWords1 !== "n" && searchWords1 !== "y") {
+            searchWords1 = (await prompt('Do you want to search for words in the grid now? (y/n): ')).toLowerCase();
+        }
+        if (searchWords1 === "y") {
+            getWordsFromGrid(strArr, rows, true, 3); // min words automatically set to 3
+        }
+
+        if (searchWords1 !== "n") {
+            let markWordsFinal = (await prompt("Do you want to mark words in the grid now? (y/n) (finish now or after 'y' by entering 'n'): ")).toLowerCase();
+            while (markWordsFinal !== "n" && markWordsFinal !== "y") {
+                markWordsFinal = (await prompt("Do you want to mark words in the grid now? (y/n) (finish now or after 'y' by entering 'n'): ")).toLowerCase();
+            }
+            if (markWordsFinal === "y") {
+                await markering();
+            }
+        }
+
+        async function markering() {
+            let words = (await prompt('Name the words you want to mark in the grid seperated by a comma (,): ')).toLowerCase();
+            while (words !== "n") {
                 words = words.replace(/\s/g, "");
                 words = words.split(",");
-                await markWordsInGrid(strArr, rows, words, xCrops, yCrops);
+                await markWordsInGrid(strArr, rowsLength, words, xCrops, yCrops);
                 words = await prompt('Name the words you want to mark in the grid seperated by a comma (,): ');
             }
         }
-        const searchWords = await prompt('Do you want to search for words in the grid now? (y/n): ');
-        if (searchWords.toLowerCase() === "y") {
-            getWordsFromGrid(strArr, rows, true, 3);
+    } else {
+        let userStr = (await prompt('Type your grid here (like abcd,efgh -> , for a new row; letters must be directly next to each other (in a row)): ')).toLowerCase().replace(/\s/g, "");
+        let rows = userStr.split(",");
+        let rowsLength = rows[0].length;
+        let strArr = [];
+        for (let i = 0; i < rows.length; ++i) {
+            let row = rows[i];
+            for (let j = 0; j < row.length; ++j) {
+                strArr.push(row.charAt(j));
+            }
+        }
+
+        let quickCheck = (await prompt("Do you just want to check wheter or not a word is in the grid? (y/n) (finish now or after 'y' by entering 'n'): ")).toLowerCase();
+        while (quickCheck !== "n" && quickCheck !== "y") {
+            quickCheck = (await prompt("Do you just want to check wheter or not a word is in the grid? (y/n) (finish now or after 'y' by entering 'n'): ")).toLowerCase();
+        }
+
+        if (quickCheck === "y") {
+            let searchedWord = (await prompt("Type searched word: ")).toLowerCase();
+            let grid = splitArray(strArr, rowsLength);
+            let allPossibilities = getAllPossibilities(grid, true).map(obj => obj.word).map(str => str.toLowerCase());
+
+            while (searchedWord !== "n") {
+                if (allPossibilities.includes(searchedWord)) {
+                    console.log("word is included");
+                } else {
+                    console.log("word is not included");
+                }
+                searchedWord = (await prompt("Type searched word: ")).toLowerCase();
+            }
+        }
+
+        let dictionaryCheck = (await prompt("Auto analyzing for possible words? (y/n): ")).toLowerCase();
+        while (dictionaryCheck !== "n" && dictionaryCheck !== "y") {
+            dictionaryCheck = (await prompt("Auto analyzing for possible words? (y/n): ")).toLowerCase();
+        }
+        if (dictionaryCheck === "y") {
+            getWordsFromGrid(strArr, rowsLength, true, 3); // min words automatically set to 3
         }
     }
+
     //getWordsFromGrid(strArr, rows, true, 3);
 
     //console.log(strArr);*/
@@ -518,7 +584,7 @@ async function markWordsInGrid(strArr, rows, keyWords, xCrops, yCrops) {
     }
     console.log("now marking cells");
     if (cellsCollection.length > 0) { // ()
-        await markCellsWithXandYCrops("./communicator/visualizedCropping.png", "./communicator/wordVisualizations.png", xCrops, yCrops, cellsCollection);
+        await markCellsWithXandYCrops("./communicator/visualizedCropping.png", "./communicator/wordVisualizations.png", xCrops, yCrops, cellsCollection); // maybe as param safe location !!!
     }
     console.groupEnd();
 }
@@ -582,7 +648,7 @@ async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilled
 
 
     // RETURNS
-    let rows;
+    let rowsLength;
     let xCrops;
     let yCrops;
 
@@ -845,7 +911,7 @@ async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilled
                 }
             });
     });
-    return { rows, xCrops, yCrops };
+    return { rowsLength, xCrops, yCrops };
     function isColorCloserToWhiteOrBlack(rgbColor) {
         const red = rgbColor[0];
         const green = rgbColor[1];
@@ -1135,7 +1201,7 @@ async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilled
         let firstStreakSpacing;
         let lastStreakSpacing;
         let streakXEnds = getResultingStreakXEnds();
-        rows = streakXEnds.length;
+        rowsLength = streakXEnds.length;
         let resStart = streaks[0][2] - firstStreakSpacing;
         let resEnd = streaks[streaks.length - 1][1] + lastStreakSpacing;
 
@@ -1728,59 +1794,3 @@ async function getLettersFromImages(dir, test) {
 
     }
 } // letters should be black ! --> e.g invert ... using seperateLettersFromGrid() automates inverting and image preprocessing
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//a();
-async function a() {
-
-    const worker = await createWorker();
-    //await worker.load();
-    await worker.loadLanguage('eng');
-    await worker.initialize('eng');
-    await worker.setParameters({
-        tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ',
-        //psm: '10', // page segmentation mode: single character
-        ocr_engine_mode: 1, // enable neural network mode
-    });
-    const { data: { text } } = await worker.recognize(
-        './puzzles/wordsearchHighGimp.png',
-        'eng',
-    );
-    console.log(text);
-    let res = [];
-
-    function isLetter(str) {
-        return str.length === 1 && str.match(/[a-z]/i);
-    }
-    let str = "hGyRCPyxlFLPdsRkgTYZ,AYoSXsVOdehUMQCPsFPx,JulThCrFnUNkfblOagbW,bmwKqLaZVcovTswIZKJw,qKGvbyjpyjvNSdWiUgIO,wVDyTANsJaewvTGPAJUa,svXIxGHUeHdmpPQfbGrA,IFlbtTSpNDgnZZvuEQIv,ntsGWNauWUmUomROMPUx,ZYnYahZeHqTsdMuAnQec,CXgcKMGUbayrwkeSigmV,NMdZqqgxCxtDcHolmUdB,QiElqqRGpoeLAlvUdViY,bKVZPcYrSjiVQxidtdbr,pitYQnuPKdpHSxrgDQiu,TAVtaGnEHfAUIoaITQJR";
-    const letters = str.replace(/,/g, '').split('');
-    compareArrs(letters, res);
-}
-
-//const Tesseract = require('tesseract.js'); // Tesseract requires internet connection
-
