@@ -1,8 +1,7 @@
-# What?
-This is a tool for analyzing grid-search puzzles, even if you don't know the words it contains.  
-It examines diagonals, rows, and cells in both directions.  
-It utilizes tesseract.js and ocrad.js together for making this cool stuff possible.  
-
+# What is this?
+This tool is designed for analyzing grid-search puzzles, even when the words within are unkown.  
+It thoroughly assesses diagonals, rows, and cells in both directions.  
+The process combines the capabilities of tesseract.js and ocrad.js to weigh results, ultimately yielding the most accurate outcomes.
 # Demo & Tutorial
 https://github.com/AquaJo/ocr-word-grid-solver/assets/84229101/1a2abc25-f55b-4d5f-b846-fd58e71c10a3
 
