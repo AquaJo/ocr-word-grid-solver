@@ -14,6 +14,9 @@ const path = require("path");
 
 startPrompting();
 
+
+
+
 async function startPrompting() {
     const readline = require('readline').createInterface({
         input: process.stdin,
@@ -27,13 +30,13 @@ async function startPrompting() {
         });
     }
 
-    let autoAnalyze = (await prompt('Do you want the puzzle to be analyzed automatically? (y/n) (else no option to visualize or locate): ')).toLowerCase();
+    let autoAnalyze = (await prompt('Do you want to use ocr? (y/n) (n --> no image, type grid / no option for visualization): ')).toLowerCase();
     while (autoAnalyze !== "n" && autoAnalyze !== "y") {
         autoAnalyze = (await prompt('Do you want the puzzle to be analyzed automatically? (y/n): ')).toLowerCase();;
     }
 
     if (autoAnalyze.toLowerCase() === "y") {
-        let imagePath = await prompt('Name the relative path to the grid puzzle image (to the projects folder): ');
+        let imagePath = await prompt('Name the relative path (e.g relative to index.js) to the grid puzzle image: ');
 
         let seperateLettersFromGridObj = await seperateLettersFromGrid(imagePath, "./letterSeperator", "./communicator", 1 / 15, 1 / 24, 130, 0.0228, "none", null,)//,3300); // second (number param) 1/6 before // instead 35 was 50 , ....  4*8 maybe into percent of image ... (width and height)
         let rowsLength = seperateLettersFromGridObj.rowsLength;
@@ -42,17 +45,17 @@ async function startPrompting() {
 
         let strArr = await getLettersFromImages("./letterSeperator/tempFinals"); // images with one letter only
 
-        let markWords = (await prompt('Do you want to mark words in the grid now? (y/n), type n (now or after y) when you want to continue: ')).toLowerCase();
+        let markWords = (await prompt('Do you want to mark specific words in the grid now? (y/n): ')).toLowerCase();
         while (markWords !== "n" && markWords !== "y") {
-            markWords = (await prompt('Do you want to mark words in the grid now? (y/n), type n (now or after y) when you want to continue: ')).toLowerCase();
+            markWords = (await prompt('Do you want to mark specific words in the grid now? (y/n): ')).toLowerCase();
         }
         if (markWords === "y") {
             await markering();
         }
 
-        let searchWords = (await prompt('Do you want to search for words in the grid now? (y/n): ')).toLowerCase();
+        let searchWords = (await prompt('Do you want to search for words from the dictionaries in the grid now? (y/n): ')).toLowerCase();
         while (searchWords !== "n" && searchWords !== "y") {
-            searchWords = (await prompt('Do you want to search for words in the grid now? (y/n): ')).toLowerCase();
+            searchWords = (await prompt('Do you want to search for words from the dictionaries in the grid now? (y/n): ')).toLowerCase();
         }
         if (searchWords === "y") {
             await getWordsFromGrid(strArr, rowsLength, true, 3); // min words automatically set to 3
@@ -118,6 +121,7 @@ async function startPrompting() {
         }
     }
 }
+
 
 
 
@@ -938,7 +942,7 @@ async function seperateLettersFromGrid(grid, outputDir, communicatorDir, XFilled
 
 
                         //let moreLimitedImage = true; // in case of seperation lines, to have them outside the picture
-                        
+
                         for (let i = 0; i < yCrops.ends.length; ++i) {
                             let toFile = outputDir + '/tempFinals/' + ((i) * allPathsLength + (myPartNum + 1)) + '.png'; // calculate number in query ...
                             await new Promise((resolve, reject) => {
