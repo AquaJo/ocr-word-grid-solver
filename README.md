@@ -4,6 +4,9 @@ It examines diagonals, rows, and cells in both directions.
 It utilizes tesseract.js and ocrad.js together for making this cool stuff possible.  
 
 # Demo & Tutorial
+https://github.com/AquaJo/ocr-word-grid-solver/assets/84229101/1a2abc25-f55b-4d5f-b846-fd58e71c10a3
+
+## In text form
 After `npm install`, do `npm start` and follow the instructions:
 
 `Do you want to use ocr? (y/n) (n --> no image, type grid / no option for visualization):` `y`  
@@ -22,9 +25,3 @@ After `npm install`, do `npm start` and follow the instructions:
 `Do you want to mark words in the grid now? (y/n):` `y`  
 `Name the words you want to mark in the grid seperated by a comma (,):` `butterfly, rainbow`  
 <img src="https://github.com/AquaJo/ocr-word-grid-solver/assets/84229101/42155551-cbce-413b-b7cd-31369384d722" alt="Image Alt Text" width="250" />
-
-
-
-
-https://github.com/AquaJo/ocr-word-grid-solver/assets/84229101/1a2abc25-f55b-4d5f-b846-fd58e71c10a3
-
