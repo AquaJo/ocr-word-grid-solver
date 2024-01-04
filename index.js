@@ -62,9 +62,9 @@ async function startPrompting() {
         }
 
         if (searchWords !== "n") {
-            let markWordsFinal = (await prompt("Do you want to mark words in the grid now? (y/n) (finish now or after 'y' by entering 'n'): ")).toLowerCase();
+            let markWordsFinal = (await prompt("Do you want to mark words in the grid now? (y/n): ")).toLowerCase();
             while (markWordsFinal !== "n" && markWordsFinal !== "y") {
-                markWordsFinal = (await prompt("Do you want to mark words in the grid now? (y/n) (finish now or after 'y' by entering 'n'): ")).toLowerCase();
+                markWordsFinal = (await prompt("Do you want to mark words in the grid now? (y/n): ")).toLowerCase();
             }
             if (markWordsFinal === "y") {
                 await markering();
@@ -92,9 +92,9 @@ async function startPrompting() {
             }
         }
 
-        let quickCheck = (await prompt("Do you just want to check wheter or not a word is in the grid? (y/n) (finish now or after 'y' by entering 'n'): ")).toLowerCase();
+        let quickCheck = (await prompt("Do you just want to check wheter or not a word is in the grid? (y/n): ")).toLowerCase();
         while (quickCheck !== "n" && quickCheck !== "y") {
-            quickCheck = (await prompt("Do you just want to check wheter or not a word is in the grid? (y/n) (finish now or after 'y' by entering 'n'): ")).toLowerCase();
+            quickCheck = (await prompt("Do you just want to check wheter or not a word is in the grid? (y/n): ")).toLowerCase();
         }
 
         if (quickCheck === "y") {
