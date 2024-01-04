@@ -24,3 +24,11 @@ After `npm install`, do `npm start` and follow the instructions:
 `Do you want to mark words in the grid now? (y/n):` `y`  
 `Name the words you want to mark in the grid seperated by a comma (,):` `butterfly, rainbow`  
 <img src="https://github.com/AquaJo/ocr-word-grid-solver/assets/84229101/42155551-cbce-413b-b7cd-31369384d722" alt="Image Alt Text" width="250" />
+
+
+# Credits
+THANKS TO:  
+https://github.com/hathibelagal/German-English-JSON-Dictionary  
+https://github.com/dwyl/english-words  
+https://gist.github.com/MarvinJWendt/2f4f4154b8ae218600eb091a5706b5f4  
+https://github.com/antimatter15/ocrad.js
