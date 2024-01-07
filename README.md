@@ -27,7 +27,7 @@ After `npm install`, do `npm start` and follow the instructions:
 
 
 # Credits
-THANKS TO:  
+language- and ocr-libs:\
 https://github.com/hathibelagal/German-English-JSON-Dictionary  
 https://github.com/dwyl/english-words  
 https://gist.github.com/MarvinJWendt/2f4f4154b8ae218600eb091a5706b5f4  
