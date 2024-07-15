@@ -1255,6 +1255,7 @@ async function seperateLettersFromGrid(
   }
 
   function getXCrops(colorBackground, pixels) {
+    // gets x-Cords, where the vertical (height-long) lines normally are near (--> after and before the letters (there where right and left gives ya background again, on those "positions" is a "xCrop"))
     let streak = 0;
     let currentStreakBegin = 0;
     let streaks = [];
