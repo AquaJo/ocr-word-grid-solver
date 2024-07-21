@@ -1070,7 +1070,7 @@ async function seperateLettersFromGrid(
   }
 
   function countMostOftenOccurrences(arr) {
-    var counts = {};
+    var counts = {}; // key: thickness, value: occurances?? ....
 
     for (var i = 0; i < arr.length; i++) {
       var num = arr[i];
@@ -1080,7 +1080,7 @@ async function seperateLettersFromGrid(
       //counts[num] = counts[num] ? counts[num] + 1 : 1;
     }
 
-    //console.log(counts)
+    console.log(counts);
     //console.log(peaksFromObj(counts));
     let peaks = peaksFromObj(counts);
     function peaksFromObj(obj) {
@@ -1088,7 +1088,7 @@ async function seperateLettersFromGrid(
       let sameKeys = keys[0];
       for (let i = 0; i < keys.length; ++i) {
         if (keys[i] !== sameKeys) {
-          sameKeys = true;
+          sameKeys = true; // not all keys are the same lol ... ^^ idk what i thought bout that ...
           break;
         } else if (i === keys.length - 1) {
           sameKeys = false;

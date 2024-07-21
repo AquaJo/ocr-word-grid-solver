@@ -28,15 +28,17 @@ export default class Contextualizer {
     }
   }
   public async analyze(input: string | Buffer | Image): Context {
-    const image = await this.inputToImage(input);
-    if (!image) throw new Error("Invalid image input");
+    const image = await this.inputToImage(input); // error when false input
     // let the extracting fun begin with an offical image object :]
   }
 
-  private async inputToImage(
-    input: string | Buffer | Image
-  ): Promise<Image | undefined> {
+  private async inputToImage(input: string | Buffer | Image): Promise<Image> {
     if (input instanceof Image) return input;
-    return await Image.create(input);
+    let img = await Image.create(input);
+    if (img instanceof Image) {
+      return img;
+    } else {
+      throw new Error("Failed to create image object");
+    }
   }
 }

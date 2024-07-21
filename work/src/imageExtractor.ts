@@ -1,3 +1,4 @@
+import { PixelArray, RGBAColor, RGBColor } from "./types";
 import Image from "./utils/image";
 
 interface DetailedLetterBufferGrid {
@@ -13,9 +14,9 @@ interface CommunicatorLetterBufferGrid extends DetailedLetterBufferGrid {
 }
 
 class ImageExtractor {
-  public static async seperateLetters(
+  /* public static async seperateLetters(
     image: Image
-  ): Promise<CommunicatorLetterBufferGrid> {}
+  ): Promise<CommunicatorLetterBufferGrid> {} */
 }
 
 interface LetterExtractorOptions_User {
@@ -35,5 +36,22 @@ class LetterExtractor {
     yStreakThickness: 1 / 24,
     minBackgroundThreshold: 130,
   };
-  constructor() {}
+  constructor(options?: LetterExtractorOptions_User) {
+    if (options) {
+      this.options = { ...this.options, ...options };
+    }
+  }
+  public async extractLetters(image: Image): Promise<DetailedLetterBufferGrid> {
+    let pixelArray = image.pixelArray;
+    let xCrops = this.getXCrops(pixelArray);
+  }
+  private getXCrops(pixels: PixelArray<RGBColor | RGBAColor>): number[] {
+    // xCrops are the vertical lines that seperate the letters
+    let xCrops: number[] = [];
+  }
+  private async getYCrops() {}
+}
+
+class ImageProperties extends Image {
+  public static getBackgroundColor() {}
 }
